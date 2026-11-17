@@ -53,4 +53,4 @@ API Key 是连接凭据，本应用不创建单独账号。聊天、文件和语
 
 见 UPSTREAM.md 与 web/LICENSE。上游 MIT 许可和第三方依赖许可随 APK 一并打包，在“设置 → 数据管理 → 关于与开源许可”可查看。保留许可归属，界面不使用 DeepSeek 鲸鱼或官方品牌图标。DeepSeek 名称仅用于说明实际 API 提供商。
 
-工程通过官方源码压缩包导入；尚未在用户 GitHub 账号下创建远程 Fork。
+工程通过官方源码压缩包导入，完整应用源码托管于 https://github.com/jinc3476-gif/cj-s-ds。
