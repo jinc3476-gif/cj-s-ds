@@ -1,0 +1,12 @@
+.tooling/
+.gradle/
+.gradle-home/
+local.properties
+**/build/
+**/node_modules/
+web/dist/
+*.jks
+*.keystore
+*.log
+*.hprof
+/artifacts/

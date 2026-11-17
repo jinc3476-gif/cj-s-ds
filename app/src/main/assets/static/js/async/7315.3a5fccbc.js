@@ -1,0 +1,1 @@
+"use strict";(self.rspackChunkjianliao=self.rspackChunkjianliao||[]).push([[7315],{6366(e,a,r){r.d(a,{createArchitectureServices:()=>s.S});var s=r(8980);r(1730)}}]);

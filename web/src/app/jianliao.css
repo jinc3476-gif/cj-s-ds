@@ -1,0 +1,58 @@
+body {
+  --dsw-static-blue-500: #205447;
+  --dsw-static-blue-450: #2d6658;
+  --dsw-static-blue-400: #3f7b69;
+  --dsw-static-blue-300: #a8c8ba;
+  --dsw-static-blue-200: #d0e2d8;
+  --dsw-static-blue-100: #e0ece4;
+  --dsw-static-blue-50: #eaf1eb;
+  --dsw-static-blue-600: #447562;
+  --dsw-static-blue-800: #315342;
+  --dsw-static-blue-900: #233a2d;
+  --dsw-alias-bg-base: #f7f6f2;
+  --dsw-alias-bg-layer-2: #fffefa;
+  --dsw-alias-bg-layer-3: #fffefa;
+  --dsw-alias-bg-skeleton: #eeede7;
+  --dsw-alias-label-primary: #242821;
+  --dsw-alias-label-secondary: #63675f;
+  --dsw-alias-label-tertiary: #878a80;
+  --dsw-specific-input-major: #fffefa;
+  -webkit-tap-highlight-color: transparent;
+}
+body[data-ds-dark-theme] {
+  --dsw-static-blue-300: #628a74;
+  --dsw-static-blue-200: #b1d2bd;
+  --dsw-static-blue-500: #99c6ad;
+  --dsw-static-blue-450: #aacfb8;
+  --dsw-static-blue-400: #86b49b;
+  --dsw-static-blue-50: #23392e;
+  --dsw-static-blue-100: #2d4538;
+  --dsw-static-blue-600: #4b765e;
+  --dsw-static-blue-800: #314d3b;
+  --dsw-static-blue-900: #23392e;
+  --dsw-alias-bg-base: #191d19;
+  --dsw-alias-bg-layer-2: #222722;
+  --dsw-alias-bg-layer-3: #292f29;
+  --dsw-alias-bg-skeleton: #30362f;
+  --dsw-alias-label-primary: #ebede5;
+  --dsw-alias-label-secondary: #b3baaf;
+  --dsw-alias-label-tertiary: #8c9689;
+  --dsw-specific-input-major: #232a23;
+}
+button,
+input,
+textarea {
+  touch-action: manipulation;
+}
+input,
+textarea {
+  font-size: 16px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,143 @@
+.container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--message-list-max-width);
+  margin: auto;
+  padding: 0 32px 64px;
+}
+
+.greeting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--dsw-alias-label-primary);
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 40px;
+  width: 100%;
+}
+.mark {
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background: var(--dsw-alias-brand-primary);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 15px 13px;
+  margin-bottom: 24px;
+  transform: rotate(-5deg);
+}
+.mark span {
+  height: 3px;
+  width: 26px;
+  background: #fff;
+  border-radius: 2px;
+}
+.mark span + span {
+  width: 18px;
+}
+.subtitle {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 14px;
+  line-height: 24px;
+  margin: 0 0 30px;
+  text-align: center;
+}
+.suggestions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.suggestions button {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.suggestions span {
+  margin-left: 8px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+@media (max-width: 439px) {
+  .greeting {
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 500;
+  }
+}
+
+@media not all and (min-width: 768px) {
+  .container {
+    flex-direction: column;
+  }
+
+  .welcome {
+    flex: 1;
+    min-height: 0;
+    justify-content: flex-end;
+    max-width: none;
+    margin: 0;
+    padding: 0 16px env(safe-area-inset-bottom);
+  }
+
+  .greeting {
+    flex-shrink: 0;
+    margin: 0 0 12px;
+  }
+  .intro {
+    margin: auto 0;
+    padding: 28px 0;
+  }
+  .suggestions {
+    flex-direction: column;
+    width: min(280px, 100%);
+  }
+  .suggestions button {
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+  }
+  @media (max-height: 550px) {
+    .intro {
+      display: none;
+    }
+  }
+
+  .caveat {
+    flex-shrink: 0;
+    width: 100%;
+    padding: 6px 0;
+    font-size: 11px;
+    line-height: 16px;
+    text-align: center;
+    color: var(--dsw-alias-label-tertiary);
+    user-select: none;
+  }
+}

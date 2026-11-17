@@ -1,0 +1,57 @@
+plugins { id 'com.android.application' }
+
+def appVersion = new Properties()
+rootProject.file('version.properties').withInputStream { appVersion.load(it) }
+def updateConfig = new Properties()
+rootProject.file('update.properties').withInputStream { updateConfig.load(it) }
+def updateUrl = updateConfig.getProperty('manifestUrl', '').trim()
+if (updateUrl) {
+    def uri = new URI(updateUrl)
+    if (uri.scheme != 'https' || !uri.host || uri.userInfo || uri.fragment) {
+        throw new GradleException('manifestUrl must be an HTTPS URL without credentials or a fragment')
+    }
+}
+
+android {
+    namespace 'com.dklabs.deepseeklite'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.dklabs.jianliao'
+        minSdk 26
+        targetSdk 34
+        versionCode appVersion.getProperty('versionCode').toInteger()
+        versionName appVersion.getProperty('versionName')
+        buildConfigField 'String', 'UPDATE_MANIFEST_URL', groovy.json.JsonOutput.toJson(updateUrl)
+    }
+    buildFeatures { buildConfig true }
+    signingConfigs {
+        debug {
+            // Preserve the certificate used by 0.1.0. Never silently generate a new one.
+            storeFile rootProject.file('.signing/jianliao-preview.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+}
+
+// Publish tooling reads this from the actual APK to reject a stale or unconfigured build.
+def updateAssets = layout.buildDirectory.dir('generated/updateAssets')
+tasks.register('generateUpdateConfig') {
+    inputs.property('manifestUrl', updateUrl)
+    outputs.dir(updateAssets)
+    doLast {
+        def folder = updateAssets.get().asFile
+        folder.mkdirs()
+        new File(folder, 'update-config.json').text = groovy.json.JsonOutput.toJson([manifestUrl: updateUrl])
+    }
+}
+android.sourceSets.main.assets.srcDir(updateAssets)
+tasks.named('preBuild').configure { dependsOn 'generateUpdateConfig' }
