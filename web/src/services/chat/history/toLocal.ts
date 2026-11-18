@@ -282,6 +282,7 @@ const buildTree = (file: SessionFile): Pick<Session, 'messages' | 'rootMessageId
 export const toLocalSession = (file: SessionFile): LocalSession => {
   const session: Session = {
     id: file.id,
+    projectId: file.quovia_project_id,
     // 空标题按「新对话」显示，导出时还原为 null。
     title: file.title ?? '',
     createdAt: time(file.inserted_at),

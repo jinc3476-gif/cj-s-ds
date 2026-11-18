@@ -1,5 +1,18 @@
 [
   {
+    "version": "0.1.6",
+    "zh-CN": [
+      "新增项目，可创建和重命名项目，并为项目保存独立记忆；普通对话与项目对话互相隔离，项目会话也支持历史备份与恢复。",
+      "Android 语音输入改为应用内原生录音，并完善录音启动、取消和资源释放流程。",
+      "调整应用主题配色，欢迎页彩虹装饰线会随标题长度变化。"
+    ],
+    "en-US": [
+      "Added projects with editable names and independent project memory. Project conversations remain separate from regular chats and are included in history backup and restore.",
+      "Android voice input now records natively in the app, with improved startup, cancellation and microphone cleanup.",
+      "Updated the app palette and made the welcome-page spectrum accent adapt to the title length."
+    ]
+  },
+  {
     "version": "0.1.5",
     "zh-CN": [
       "浅色首页改为纯白，仅保留「想法，从这里开始」。Quovia 字标沿用输入框的彩虹配色。",

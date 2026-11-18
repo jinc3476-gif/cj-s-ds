@@ -19,6 +19,7 @@ import {
   applyEvent,
   canContinueReply,
   getContextRounds,
+  getReplyText,
   settleReply,
   toRequestMessages,
 } from './reply.js'
@@ -27,6 +28,7 @@ import {
   type AssistantMessage,
   type FileAttachment,
   type Message,
+  type Project,
   type Session,
   type SessionSummary,
   type UserMessage,
@@ -66,6 +68,8 @@ type ChatState = {
   importingHistory: boolean
   /** 仅列表元数据，按 updatedAt 降序；流式消息更新不会改变此数组。 */
   sessions: SessionSummary[]
+  projects: Project[]
+  activeProjectId: string | null
   sessionCache: Record<string, Session>
   sessionLoadErrors: Record<string, boolean>
   sessionSaveErrors: Record<string, boolean>
@@ -80,6 +84,8 @@ export const useChatStore = create<ChatState>(() => ({
   initError: false,
   importingHistory: false,
   sessions: [],
+  projects: [],
+  activeProjectId: null,
   sessionCache: {},
   sessionLoadErrors: {},
   sessionSaveErrors: {},
@@ -299,9 +305,12 @@ export const initChat = (): Promise<void> => {
   set({ initError: false })
   initTask = (async () => {
     try {
-      const summaries = await db.loadSessionSummaries()
+      const [summaries, projects] = await Promise.all([
+        db.loadSessionSummaries(),
+        db.loadProjects(),
+      ])
       if (epoch === historyEpoch) {
-        set({ ready: true, sessions: sortSessions(summaries) })
+        set({ ready: true, sessions: sortSessions(summaries), projects })
       }
     } catch (error) {
       if (epoch === historyEpoch) {
@@ -389,7 +398,7 @@ const waitForIdle = (sessionId?: string) =>
  * 替换历史对话：先写入暂存，成功后原子替换旧记录；写入为空即删除全部会话与附件。
  * 期间停止生成并禁止修改会话；失败时清除暂存，保留原有记录。
  */
-export const replaceHistory = async (write: () => Promise<void>): Promise<number> => {
+export const replaceHistory = async (write: () => Promise<Project[]>): Promise<number> => {
   if (get().importingHistory) {
     throw new Error('History replacement is already in progress')
   }
@@ -406,9 +415,10 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
     await waitForIdle()
     await db.clearStaging()
     let summaries: SessionSummary[]
+    let projects: Project[]
     try {
-      await write()
-      summaries = await db.commitStaging()
+      projects = await write()
+      summaries = await db.commitStaging(projects)
     } catch (error) {
       await db.clearStaging().catch(db.reportStorageError('clear unfinished history replacement'))
       throw error
@@ -421,6 +431,8 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
       ready: true,
       initError: false,
       sessions: sortSessions(summaries),
+      projects,
+      activeProjectId: null,
       sessionCache: {},
       sessionLoadErrors: {},
       sessionSaveErrors: {},
@@ -440,17 +452,47 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
   }
 }
 
-export const newChat = () => {
-  if (!get().importingHistory) {
-    set({ activeId: null })
+export const newChatIn = (projectId: string | null) => {
+  if (!get().importingHistory && (!projectId || get().projects.some((p) => p.id === projectId))) {
+    set({ activeId: null, activeProjectId: projectId })
     trimSessionCache()
   }
 }
 
+export const newChat = () => newChatIn(null)
+export const projectDraftKey = (projectId: string | null) => projectId && `project:${projectId}`
+
+export const saveProject = async (id: string | undefined, name: string, memory: string) => {
+  if (
+    !get().ready ||
+    get().importingHistory ||
+    !name.trim() ||
+    (id && !get().projects.some((p) => p.id === id))
+  ) {
+    return false
+  }
+  const project = {
+    id: id ?? createId(),
+    name: name.trim().slice(0, 80),
+    memory: memory.trim().slice(0, 4000),
+  }
+  const epoch = historyEpoch
+  await db.saveProject(project)
+  if (epoch !== historyEpoch || get().importingHistory) {
+    return false
+  }
+  set((state) => ({ projects: [...state.projects.filter((p) => p.id !== project.id), project] }))
+  if (!id) {
+    newChatIn(project.id)
+  }
+  return true
+}
+
 export const selectSession = (id: string) => {
-  if (!get().importingHistory && get().sessions.some((session) => session.id === id)) {
+  const summary = get().sessions.find((session) => session.id === id)
+  if (!get().importingHistory && summary) {
     touchSession(id)
-    set({ activeId: id })
+    set({ activeId: id, activeProjectId: summary.projectId ?? null })
     void ensureSessionLoaded(id)
     trimSessionCache()
   }
@@ -549,7 +591,8 @@ export const sendMessage = (targetSessionId: string | null) => {
   if (get().importingHistory || !get().ready) {
     return false
   }
-  const prepared = prepareDraftMessage(getDraft(targetSessionId), useUploads.getState().tasks)
+  const draftId = targetSessionId ?? projectDraftKey(get().activeProjectId)
+  const prepared = prepareDraftMessage(getDraft(draftId), useUploads.getState().tasks)
   if (!prepared) {
     return false
   }
@@ -565,6 +608,7 @@ export const sendMessage = (targetSessionId: string | null) => {
   if (sessionId === null) {
     const session: Session = {
       id: createId(),
+      projectId: get().activeProjectId ?? undefined,
       title: '',
       createdAt: now,
       updatedAt: now,
@@ -610,7 +654,7 @@ export const sendMessage = (targetSessionId: string | null) => {
     ])
   }
   persist(sessionId)
-  clearSentDraft(targetSessionId)
+  clearSentDraft(draftId)
   void streamReply(sessionId, reply, { history, question })
   return true
 }
@@ -750,6 +794,28 @@ export const retryUpload = (sessionId: string, messageId: string) => {
 }
 
 type Request = { history: Message[]; question: UserMessage; prefix?: AssistantMessage }
+
+// Only the selected branches of sibling chats are eligible. Never replay their files or tool results.
+const projectContext = async (sessionId: string) => {
+  const projectId = getSession(sessionId)?.projectId
+  const project = projectId && get().projects.find((p) => p.id === projectId)
+  if (!project) {
+    return ''
+  }
+  const lines = [project.memory]
+  for (const sibling of get()
+    .sessions.filter((s) => s.projectId === projectId && s.id !== sessionId)
+    .slice(0, 4)) {
+    const session = getSession(sibling.id) ?? (await db.loadSession(sibling.id))
+    if (session?.projectId !== projectId) {
+      continue
+    }
+    for (const [user, reply] of getContextRounds(getVisibleMessages(session)).slice(-2)) {
+      lines.push(`Q: ${user.content.slice(0, 320)}\nA: ${getReplyText(reply).slice(0, 640)}`)
+    }
+  }
+  return lines.filter(Boolean).join('\n\n')
+}
 
 /** 把补传得到的 serverId 写回会话里所有引用同一附件的消息（编辑、重新生成会共用附件） */
 const saveServerIds = (sessionId: string, serverIds: Map<string, string>) => {
@@ -989,9 +1055,16 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         reply = { ...reply, latestReminder }
         updateReply(sessionId, reply)
         persist(sessionId)
+        const memory = await projectContext(sessionId)
+        controller.signal.throwIfAborted()
         const messages = toRequestMessages(
           prepared.history,
-          prepared.question,
+          memory
+            ? {
+                ...prepared.question,
+                content: `项目参考资料（非系统指令）：\n${memory}\n\n当前问题：\n${prepared.question.content}`,
+              }
+            : prepared.question,
           prepared.prefix,
           initial.thinking ?? false,
           latestReminder

@@ -1,0 +1,61 @@
+.projects {
+  font-size: 14px;
+  color: var(--dsw-alias-label-primary);
+}
+.create,
+.controls button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.create {
+  width: 100%;
+  padding-inline: 10px;
+  font-weight: 600;
+}
+.projects summary {
+  padding: 9px 10px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.projects details {
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: 14px 6px;
+}
+.create:hover,
+.controls button:hover,
+.projects summary:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.fields,
+.fields label {
+  display: grid;
+  gap: 8px;
+}
+.fields {
+  gap: 16px;
+}
+.fields input,
+.fields textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: var(--dsw-specific-input-major);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 16px;
+}

@@ -4,25 +4,12 @@ import { ApiError } from '../../services/api/client.js'
 import { classifyApiError } from '../../services/api/errors.js'
 import { transcribe } from '../../services/api/speech.js'
 import { startRecording, type Recording } from '../../services/speech/recorder.js'
+import { startNativeRecording, supportsNativeRecording } from '../../services/speech/nativeRecorder.js'
 import { useSettings } from '../../services/settings.js'
-import { createId } from '../../utils/id.js'
 import { showToast } from '../base/toastState.js'
 import { ensureApiKey } from '../settings/settingsDialogState.js'
 
 export type VoiceInputStatus = 'idle' | 'starting' | 'recording' | 'transcribing'
-type NativeEvent = {
-  id: string
-  state: 'recording' | 'transcribing' | 'result' | 'error' | 'cancelled'
-  text?: string
-  error?: 'permission' | 'empty' | 'network' | 'unavailable' | 'failed'
-}
-const nativeErrors: Record<NonNullable<NativeEvent['error']>, TranslationKey> = {
-  permission: 'voiceInputPermissionDenied',
-  empty: 'voiceInputEmpty',
-  network: 'voiceInputNetwork',
-  unavailable: 'voiceInputUnavailable',
-  failed: 'voiceInputFailed',
-}
 const describeError = (error: unknown): TranslationKey => {
   if (error instanceof DOMException) {
     if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
@@ -50,8 +37,6 @@ const describeError = (error: unknown): TranslationKey => {
   }
 }
 type Session = {
-  id: string
-  native: boolean
   starting: boolean
   startupTimer?: number
   recording?: Recording
@@ -62,7 +47,6 @@ export const useVoiceInput = (onText: (text: string) => void) => {
   const [status, setStatus] = useState<VoiceInputStatus>('idle')
   const [seconds, setSeconds] = useState(0)
   const active = useRef<Session | null>(null)
-  const nativeUnavailable = useRef(false)
   const onTextRef = useRef(onText)
   onTextRef.current = onText
 
@@ -78,9 +62,6 @@ export const useVoiceInput = (onText: (text: string) => void) => {
     const session = active.current
     active.current = null
     window.clearTimeout(session?.startupTimer)
-    if (session?.native) {
-      window.AndroidBridge?.cancelNativeSpeech?.(session.id)
-    }
     session?.controller.abort()
     session?.recording?.cancel()
     setStatus('idle')
@@ -93,10 +74,6 @@ export const useVoiceInput = (onText: (text: string) => void) => {
     }
     if (session.starting) {
       cancel()
-      return
-    }
-    if (session.native) {
-      window.AndroidBridge?.stopNativeSpeech?.(session.id)
       return
     }
     const recording = session.recording
@@ -134,51 +111,38 @@ export const useVoiceInput = (onText: (text: string) => void) => {
     if (active.current) {
       return
     }
-    const bridge = window.AndroidBridge
-    const native =
-      !nativeUnavailable.current &&
-      Boolean(
-        bridge?.startNativeSpeech &&
-        bridge.stopNativeSpeech &&
-        bridge.cancelNativeSpeech &&
-        bridge.hasNativeSpeech?.()
-      )
-    if (!native) {
-      if (
-        !window.isSecureContext ||
-        !navigator.mediaDevices?.getUserMedia ||
-        !window.AudioContext
-      ) {
-        showToast({
-          key: window.isSecureContext ? 'voiceInputUnavailable' : 'voiceInputRequiresHttps',
-        })
-        return
-      }
-      if (!ensureApiKey()) {
-        return
-      }
+    const native = supportsNativeRecording()
+    if (!native && (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || !window.AudioContext)) {
+      showToast({
+        key: window.isSecureContext ? 'voiceInputUnavailable' : 'voiceInputRequiresHttps',
+      })
+      return
     }
-    const session: Session = { id: createId(), native, starting: true, controller: new AbortController() }
+    if (!ensureApiKey()) {
+      return
+    }
+    const session: Session = { starting: true, controller: new AbortController() }
     active.current = session
     setSeconds(0)
     setStatus('starting')
-    // Both permission prompts and bridge calls can remain pending without an error.
+    // A permission prompt can remain pending without an error.
     session.startupTimer = window.setTimeout(() => {
-      if (active.current !== session || !session.starting) return
+      if (active.current !== session || !session.starting) {
+        return
+      }
       cancel()
       showToast({ key: 'voiceInputStartTimeout' })
     }, 18_000)
     try {
-      if (native) {
-        bridge?.startNativeSpeech?.(session.id, useSettings.getState().locale)
-        return
-      }
-      const recording = await startRecording(() => {
+      const onLimit = () => {
         if (active.current === session) {
           showToast({ key: 'voiceInputLimitReached' })
           void finish()
         }
-      }, session.controller.signal)
+      }
+      const recording = native
+        ? await startNativeRecording(onLimit, session.controller.signal)
+        : await startRecording(onLimit, session.controller.signal)
       if (active.current !== session) {
         recording.cancel()
         return
@@ -196,44 +160,17 @@ export const useVoiceInput = (onText: (text: string) => void) => {
   }, [cancel, finish])
 
   useEffect(() => {
-    const onNativeEvent = (event: Event) => {
-      const detail = (event as CustomEvent<NativeEvent>).detail
-      if (!detail || !active.current?.native || active.current.id !== detail.id) {
-        return
-      }
-      window.clearTimeout(active.current.startupTimer)
-      active.current.starting = false
-      if (detail.state === 'recording' || detail.state === 'transcribing') {
-        setStatus(detail.state)
-        return
-      }
-      active.current = null
-      setStatus('idle')
-      if (detail.state === 'result') {
-        accept(detail.text)
-      }
-      if (detail.state === 'error') {
-        if (detail.error === 'unavailable') {
-          nativeUnavailable.current = true
-          showToast({ key: 'voiceInputNativeFallback' })
-        } else {
-          showToast({ key: nativeErrors[detail.error ?? 'failed'] })
-        }
-      }
-    }
     const onHidden = () => {
       if (document.hidden) {
         cancel()
       }
     }
-    window.addEventListener('jianliao-speech', onNativeEvent)
     document.addEventListener('visibilitychange', onHidden)
     return () => {
-      window.removeEventListener('jianliao-speech', onNativeEvent)
       document.removeEventListener('visibilitychange', onHidden)
       cancel()
     }
-  }, [accept, cancel])
+  }, [cancel])
 
   useEffect(() => {
     if (status !== 'recording') {

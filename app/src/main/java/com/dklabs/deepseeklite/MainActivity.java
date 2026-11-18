@@ -32,16 +32,16 @@ public class MainActivity extends Activity {
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private File pendingExport;
     private AppUpdater updater;
-    private NativeSpeechInput speech;
+    private NativeAudioRecorder audioRecorder;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         preferences = getSharedPreferences("private-settings", MODE_PRIVATE);
         updater = new AppUpdater(this, state);
         web = new WebView(this);
-        speech = new NativeSpeechInput(this, event -> {
+        audioRecorder = new NativeAudioRecorder(this, event -> {
             if (isAppPage()) web.evaluateJavascript(
-                    "window.dispatchEvent(new CustomEvent('jianliao-speech',{detail:" + event + "}))", null);
+                    "window.dispatchEvent(new CustomEvent('jianliao-recorder',{detail:" + event + "}))", null);
         });
         web.setBackgroundColor(android.graphics.Color.WHITE);
         getWindow().getDecorView().setSystemUiVisibility(getWindow().getDecorView().getSystemUiVisibility()
@@ -179,13 +179,16 @@ public class MainActivity extends Activity {
     }
 
     public class DeviceBridge {
-        @JavascriptInterface public boolean hasNativeSpeech() { return speech.available(); }
-        @JavascriptInterface public void startNativeSpeech(String id, String language) {
-            runOnUiThread(() -> { if (isAppPage() && !isFinishing()) speech.start(id, language); });
-        }
-        @JavascriptInterface public void stopNativeSpeech(String id) { runOnUiThread(() -> speech.stop(id)); }
-        @JavascriptInterface public void cancelNativeSpeech(String id) { runOnUiThread(() -> speech.cancel(id)); }
         @JavascriptInterface public void checkForUpdate() { runOnUiThread(() -> updater.check(true)); }
+        @JavascriptInterface public void startNativeRecording(String id) {
+            runOnUiThread(() -> { if (isAppPage() && !isFinishing()) audioRecorder.start(id); });
+        }
+        @JavascriptInterface public void stopNativeRecording(String id) {
+            runOnUiThread(() -> audioRecorder.stop(id));
+        }
+        @JavascriptInterface public void cancelNativeRecording(String id) {
+            runOnUiThread(() -> audioRecorder.cancel(id));
+        }
         @JavascriptInterface public String getAppVersion() { return BuildConfig.VERSION_NAME; }
         @JavascriptInterface public boolean isUpdateConfigured() { return !BuildConfig.UPDATE_MANIFEST_URL.isEmpty(); }
         @JavascriptInterface public synchronized String getApiKey() {
@@ -227,13 +230,13 @@ public class MainActivity extends Activity {
 
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] grants) {
         super.onRequestPermissionsResult(code, permissions, grants);
-        if (code == NativeSpeechInput.PERMISSION) {
-            speech.onPermissionResult(grants.length > 0 && grants[0] == PackageManager.PERMISSION_GRANTED);
-        }
         if (code == AUDIO_PERMISSION && microphoneRequest != null) {
             if (grants.length > 0 && grants[0] == PackageManager.PERMISSION_GRANTED) microphoneRequest.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
             else microphoneRequest.deny();
             microphoneRequest = null;
+        }
+        if (code == NativeAudioRecorder.PERMISSION) {
+            audioRecorder.onPermissionResult(grants.length > 0 && grants[0] == PackageManager.PERMISSION_GRANTED);
         }
     }
     @Override protected void onActivityResult(int code, int result, Intent data) {
@@ -265,11 +268,11 @@ public class MainActivity extends Activity {
     }
     @Override protected void onSaveInstanceState(Bundle state) { updater.saveState(state); super.onSaveInstanceState(state); }
     @Override protected void onPause() { updater.onPause(); super.onPause(); web.onPause(); }
-    @Override protected void onResume() { super.onResume(); if (web != null) web.onResume(); if (updater != null) updater.onResume(); if (speech != null) speech.refreshAvailability(); }
-    @Override protected void onStop() { speech.cancelActive(); super.onStop(); }
+    @Override protected void onResume() { super.onResume(); if (web != null) web.onResume(); if (updater != null) updater.onResume(); }
+    @Override protected void onStop() { audioRecorder.cancelActive(); super.onStop(); }
     @Override protected void onDestroy() {
         updater.destroy();
-        speech.cancelActive();
+        audioRecorder.destroy();
         if (fileCallback != null) fileCallback.onReceiveValue(null);
         if (microphoneRequest != null) microphoneRequest.deny();
         web.removeJavascriptInterface("AndroidBridge"); web.destroy(); io.shutdown(); super.onDestroy();

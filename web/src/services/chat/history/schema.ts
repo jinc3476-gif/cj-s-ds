@@ -227,7 +227,7 @@ const sessionId: Read<string> = (value) => {
 }
 
 /** 版本号用于校验归档格式兼容性；字段结构由各字段的校验函数保证。 */
-export const checkManifest = (value: unknown): void => {
+export const checkManifest = (value: unknown) => {
   const version = record(value).export_format_version
   if (typeof version === 'number' && version > EXPORT_FORMAT_VERSION) {
     fail('backupNewerVersion')
@@ -235,6 +235,23 @@ export const checkManifest = (value: unknown): void => {
   if (version !== EXPORT_FORMAT_VERSION) {
     fail('backupInvalidVersion')
   }
+  const raw = record(value).quovia_projects
+  const projects =
+    raw === undefined
+      ? []
+      : list((v) => {
+          const item = record(v)
+          const name = string(item.name).trim()
+          const memory = string(item.memory)
+          if (!name || name.length > 80 || memory.length > 4000) {
+            return invalid()
+          }
+          return { id: sessionId(item.id), name, memory }
+        })(raw)
+  if (new Set(projects.map((p) => p.id)).size !== projects.length) {
+    return invalid()
+  }
+  return projects
 }
 
 export const readSessionIndex: Read<SessionIndexEntry[]> = list((value) => {
@@ -253,6 +270,8 @@ export const readSessionFile: Read<SessionFile> = (value) => {
   const item = record(value)
   return {
     id: sessionId(item.id),
+    quovia_project_id:
+      item.quovia_project_id === undefined ? undefined : sessionId(item.quovia_project_id),
     title: nullable(string)(item.title),
     pinned: false,
     current_message_id: count(item.current_message_id),

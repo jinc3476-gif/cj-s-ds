@@ -26,7 +26,7 @@ await page.addInitScript(version => {
   window.AndroidBridge = {
     getApiKey: () => localStorage.getItem('synthetic-native-key') ?? '',
     setApiKey: key => { localStorage.setItem('synthetic-native-key', key); return true },
-    saveDownload: (name, base64) => { window.testDownload = { name, length: base64.length } },
+    saveDownload: (name, base64) => { window.testDownload = { name, base64, length: base64.length } },
     getAppVersion: () => version,
     isUpdateConfigured: () => window.testUpdateConfigured ?? false,
     checkForUpdate: () => { window.testUpdateChecks = (window.testUpdateChecks ?? 0) + 1 },
@@ -229,6 +229,73 @@ try {
     await visible(page.getByRole('heading', { name: '想法，从这里开始', exact: true }))
     await page.screenshot({ path: resolve(output, '05-dark-home.png') })
     await noOverflow()
+  })
+  await check('项目重命名、草稿与记忆隔离、跨对话回忆和刷新恢复', async () => {
+    const drawer = () => button('打开边栏').click()
+    const draft = page.locator('main textarea')
+    const create = async (name, memory) => {
+      await drawer()
+      await button('创建项目').click()
+      await page.getByLabel('项目名称').fill(name)
+      await page.getByLabel('项目记忆（仅在本项目共享）').fill(memory)
+      await button('确定').click()
+      await visible(page.getByRole('heading', { name, exact: true }))
+    }
+    const send = async text => {
+      const count = requests.filter(r => r.body).length
+      await draft.fill(text)
+      await button('发送').click()
+      await visible(page.getByText('我记得前面的内容。', { exact: false }).last())
+      assert.equal(requests.filter(r => r.body).length, count + 1)
+      return JSON.stringify(requests.filter(r => r.body).at(-1).body)
+    }
+    await draft.fill('ordinary-draft')
+    await create('项目 A', 'memory-A')
+    assert.equal(await draft.inputValue(), '')
+    assert.match(await send('question-A1'), /memory-A/)
+    await button('新建项目对话').click()
+    assert.match(await send('question-A2'), /question-A1/)
+    await create('项目 B', 'memory-B')
+    const b = await send('question-B')
+    assert.match(b, /memory-B/)
+    assert.doesNotMatch(b, /memory-A|question-A/)
+    await drawer()
+    await button('编辑项目').click()
+    await page.getByLabel('项目名称').fill('更名项目 B')
+    await button('确定').click()
+    await visible(page.locator('summary').getByText('更名项目 B', { exact: true }))
+    await page.screenshot({ path: resolve(output, 'projects-review.png') })
+    await button('开启新对话').first().click()
+    assert.equal(await draft.inputValue(), 'ordinary-draft')
+    assert.doesNotMatch(await send('ordinary-question'), /memory-[AB]|question-[AB]/)
+    await page.reload()
+    await drawer()
+    await page.locator('summary').filter({ hasText: '更名项目 B' }).click()
+    await button('新建项目对话').click()
+    const restored = await send('after-reload')
+    assert.match(restored, /memory-B/)
+    assert.match(restored, /question-B/)
+    assert.doesNotMatch(restored, /memory-A|ordinary-question/)
+    await drawer()
+    await button('设置').click()
+    await setting('data').click()
+    await button('下载').click()
+    await page.waitForFunction(() => window.testDownload?.length > 0)
+    const archive = await page.evaluate(() => window.testDownload)
+    await page.locator('input[accept*=".zip"]').setInputFiles({
+      name: archive.name, mimeType: 'application/zip', buffer: Buffer.from(archive.base64, 'base64')
+    })
+    await button('确认导入').click()
+    await visible(page.getByText(/已导入 \d+ 个对话/))
+    await button('返回').click()
+    await button('关闭').click()
+    await drawer()
+    await page.locator('summary').filter({ hasText: '更名项目 B' }).click()
+    await button('新建项目对话').click()
+    const imported = await send('after-import')
+    assert.match(imported, /memory-B/)
+    assert.match(imported, /question-B/)
+    assert.doesNotMatch(imported, /memory-A|ordinary-question/)
   })
   assert.deepEqual(errors, [])
   results.push('无浏览器运行时异常')

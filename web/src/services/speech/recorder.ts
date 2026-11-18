@@ -17,7 +17,10 @@ export type Recording = {
 }
 
 /** 开始录音；到达时长上限时调用 onLimit，由调用方决定何时 stop */
-export const startRecording = async (onLimit: () => void, signal: AbortSignal): Promise<Recording> => {
+export const startRecording = async (
+  onLimit: () => void,
+  signal: AbortSignal
+): Promise<Recording> => {
   if (signal.aborted) {
     throw new DOMException('Cancelled', 'AbortError')
   }
@@ -55,16 +58,25 @@ export const startRecording = async (onLimit: () => void, signal: AbortSignal): 
     context = new AudioContext()
     // Request playback activation during the gesture, before a permission dialog can consume it.
     const resumed = context.state === 'suspended' ? context.resume() : Promise.resolve()
-    await Promise.all([resumed, navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
-    }).then((media) => {
-      if (released) {
-        for (const track of media.getTracks()) track.stop()
-        throw new DOMException('Cancelled', 'AbortError')
-      }
-      stream = media
-    })])
-    if (signal.aborted || !stream) throw new DOMException('Cancelled', 'AbortError')
+    await Promise.all([
+      resumed,
+      navigator.mediaDevices
+        .getUserMedia({
+          audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+        })
+        .then((media) => {
+          if (released) {
+            for (const track of media.getTracks()) {
+              track.stop()
+            }
+            throw new DOMException('Cancelled', 'AbortError')
+          }
+          stream = media
+        }),
+    ])
+    if (signal.aborted || !stream) {
+      throw new DOMException('Cancelled', 'AbortError')
+    }
     const rate = context.sampleRate
     source = context.createMediaStreamSource(stream)
     processor = context.createScriptProcessor(BUFFER_SIZE, 1, 1)

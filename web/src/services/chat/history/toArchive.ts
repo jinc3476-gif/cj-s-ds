@@ -258,6 +258,7 @@ export const toSessionFile = (original: Session, exportImage: ExportImage): Sess
   const current = getVisibleMessages(session).at(-1)
   return {
     id: session.id,
+    quovia_project_id: session.projectId,
     title: session.title || null,
     pinned: false,
     // 格式要求非空；空会话没有消息可指向，写 0。

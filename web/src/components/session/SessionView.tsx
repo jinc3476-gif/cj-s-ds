@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { useIsMobile } from '../../app/viewport.js'
 import { useTranslate } from '../../i18n/index.js'
 import type { Session } from '../../services/chat/types.js'
+import { useChatStore } from '../../services/chat/store.js'
 import { ChatInput } from '../chatInput/ChatInput.js'
 import { MessageList } from '../messages/MessageList.js'
 import { MobileHeader } from './MobileHeader.js'
@@ -19,7 +20,8 @@ export const SessionView = ({
 }) => {
   const t = useTranslate()
   const isMobile = useIsMobile()
-  const title = session.title || t('untitledChat')
+  const project = useChatStore(s => s.projects.find(p => p.id === session.projectId))
+  const title = [project?.name, session.title || t('untitledChat')].filter(Boolean).join(' / ')
   return (
     <div className={styles.view}>
       {isMobile ? (

@@ -1,4 +1,5 @@
 import * as db from '../db.js'
+import type { Project } from '../types.js'
 import { BackupError, fail } from './errors.js'
 import type { SessionIndexEntry } from './format.js'
 import { INDEX_PATH, MANIFEST_PATH, USER_PATH, parseSessionPath, sessionFilesDir } from './paths.js'
@@ -78,7 +79,7 @@ export const checkArchiveFormat = async (file: File): Promise<void> => {
  * 会话读完立即暂存，只保留图片路径映射；图片全部读完后逐会话回填 MIME，不改变图片身份。
  * 写入导入暂存存储；调用方负责先清空暂存，成功后替换正式数据，失败时清理暂存。
  */
-export const importArchive = async (file: File): Promise<void> => {
+export const importArchive = async (file: File): Promise<Project[]> => {
   if (!(await isZipFile(file))) {
     fail('backupUnrecognized')
   }
@@ -87,6 +88,8 @@ export const importArchive = async (file: File): Promise<void> => {
   /** 已保存的原件：文件 ID → MIME。同一图片出现在多个会话目录时只保存一次。 */
   const stored = new Map<string, string>()
   let manifest = false
+  let projects: Project[] = []
+  let projectIds = new Set<string>()
   let index: SessionIndexEntry[] | undefined
   let currentSessionId: string | undefined
 
@@ -109,14 +112,16 @@ export const importArchive = async (file: File): Promise<void> => {
         if (path !== MANIFEST_PATH) {
           fail('backupUnrecognized')
         }
-        checkManifest(await readJson(entry))
+        projects = checkManifest(await readJson(entry))
+        projectIds = new Set(projects.map(p => p.id))
         manifest = true
       } else if (path === USER_PATH && !index && imported.size === 0) {
         // 账号信息（已脱敏）不导入；文件可能缺失。
         await skipEntry(entry)
       } else if (sessionId !== null && !index) {
         const local = toLocalSession(readSessionFile(await readJson(entry)))
-        if (local.session.id !== sessionId || imported.has(sessionId)) {
+        if (local.session.id !== sessionId || imported.has(sessionId) ||
+            (local.session.projectId && !projectIds.has(local.session.projectId))) {
           fail('backupIncomplete')
         }
         imported.add(sessionId)
@@ -156,4 +161,5 @@ export const importArchive = async (file: File): Promise<void> => {
     fail('backupIncomplete')
   }
   await db.updateStagingFileTypes(stored)
+  return projects
 }

@@ -105,8 +105,11 @@ export type AssistantMessage = MessageBranch & {
 
 export type Message = UserMessage | AssistantMessage
 
+export type Project = { id: string; name: string; memory: string }
+
 export type Session = {
   id: string
+  projectId?: string
   title: string
   createdAt: number
   updatedAt: number
@@ -117,11 +120,12 @@ export type Session = {
 }
 
 /** 会话列表元数据；消息只在打开会话时加载。 */
-export type SessionSummary = Pick<Session, 'id' | 'title' | 'createdAt' | 'updatedAt'>
+export type SessionSummary = Pick<Session, 'id' | 'projectId' | 'title' | 'createdAt' | 'updatedAt'>
 
 /** 显式提取字段，避免将完整会话的消息带进列表。 */
 export const toSessionSummary = (session: SessionSummary): SessionSummary => ({
   id: session.id,
+  projectId: session.projectId,
   title: session.title,
   createdAt: session.createdAt,
   updatedAt: session.updatedAt,

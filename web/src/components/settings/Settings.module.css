@@ -10,7 +10,7 @@
 }
 
 :global([data-ds-dark-theme]) .dialog {
-  --settings-background: #191d19;
+  --settings-background: var(--dsw-alias-bg-base);
   --settings-surface: var(--dsw-alias-bg-layer-2);
 }
 

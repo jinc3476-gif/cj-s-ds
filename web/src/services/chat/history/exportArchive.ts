@@ -1,5 +1,5 @@
 import * as db from '../db.js'
-import type { Session } from '../types.js'
+import type { Project, Session } from '../types.js'
 import { EXPORT_FORMAT_VERSION, type Manifest, type SessionIndexEntry } from './format.js'
 import { INDEX_PATH, MANIFEST_PATH, imagePath, sessionPath } from './paths.js'
 import { toIndexEntry, toSessionFile } from './toArchive.js'
@@ -12,9 +12,9 @@ const json = (value: unknown) => new Blob([JSON.stringify(value)], { type: 'appl
  * 只写出本地有原件的图片，每个会话目录各写一份；其他附件只有元数据。
  */
 export const exportArchive = async (
-  sessions: Iterable<Session> | AsyncIterable<Session>
+  sessions: Iterable<Session> | AsyncIterable<Session>, projects: Project[]
 ): Promise<Blob> => {
-  const manifest: Manifest = { export_format_version: EXPORT_FORMAT_VERSION }
+  const manifest: Manifest = { export_format_version: EXPORT_FORMAT_VERSION, quovia_projects: projects }
   const entries = [{ name: MANIFEST_PATH, blob: json(manifest) }]
   const imageEntries: { name: string; blob: Blob }[] = []
   const index: SessionIndexEntry[] = []
