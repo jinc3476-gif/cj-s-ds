@@ -139,7 +139,7 @@ final class AppUpdater {
     private void showReady(UpdateInfo info) {
         ready = info;
         show(new AlertDialog.Builder(activity).setTitle("新版已下载")
-                .setMessage("简聊 " + info.versionName + " 已准备好。点击安装后，请在系统界面确认更新。")
+                .setMessage("Quovia " + info.versionName + " 已准备好。点击安装后，请在系统界面确认更新。")
                 .setNegativeButton("稍后安装", null)
                 .setPositiveButton("安装新版", (d, which) -> install(info)).create());
     }
@@ -149,13 +149,13 @@ final class AppUpdater {
         if (!activity.getPackageManager().canRequestPackageInstalls()) {
             ready = info;
             show(new AlertDialog.Builder(activity).setTitle("允许安装更新")
-                    .setMessage("请在接下来的系统设置中允许“简聊”安装应用，然后返回继续安装。")
+                    .setMessage("请在接下来的系统设置中允许“Quovia”安装应用，然后返回继续安装。")
                     .setNegativeButton("取消", null)
                     .setPositiveButton("前往设置", (d, which) -> {
                         try {
                             activity.startActivityForResult(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                                     Uri.parse("package:" + activity.getPackageName())), INSTALL_PERMISSION);
-                        } catch (Exception error) { showMessage("无法打开设置", "请在手机设置中允许简聊安装未知应用，然后重新检查更新。"); }
+                        } catch (Exception error) { showMessage("无法打开设置", "请在手机设置中允许 Quovia 安装未知应用，然后重新检查更新。"); }
                     }).create());
             return;
         }
@@ -172,7 +172,7 @@ final class AppUpdater {
                         Uri uri = FileProvider.getUriForFile(activity, activity.getPackageName() + ".updates", apk);
                         Intent intent = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
                                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                        intent.setClipData(ClipData.newRawUri("简聊更新", uri));
+                        intent.setClipData(ClipData.newRawUri("Quovia 更新", uri));
                         activity.startActivity(intent);
                     } catch (Exception error) { showMessage("无法开始安装", "请检查系统安装权限，再通过“检查更新”重试。"); }
                 });
@@ -194,7 +194,7 @@ final class AppUpdater {
         int flags = Build.VERSION.SDK_INT >= 28 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
         PackageInfo candidate = pm.getPackageArchiveInfo(file.getAbsolutePath(), flags);
         PackageInfo installed = pm.getPackageInfo(activity.getPackageName(), flags);
-        if (candidate == null || !activity.getPackageName().equals(candidate.packageName)) throw new IOException("安装包不属于简聊，已停止更新");
+        if (candidate == null || !activity.getPackageName().equals(candidate.packageName)) throw new IOException("安装包不属于 Quovia，已停止更新");
         long code = Build.VERSION.SDK_INT >= 28 ? candidate.getLongVersionCode() : candidate.versionCode;
         long current = Build.VERSION.SDK_INT >= 28 ? installed.getLongVersionCode() : installed.versionCode;
         if (code != info.versionCode || code <= current || !info.versionName.equals(candidate.versionName)) throw new IOException("安装包版本与更新信息不一致");

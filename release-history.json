@@ -1,5 +1,18 @@
 [
   {
+    "version": "0.1.4",
+    "zh-CN": [
+      "应用正式使用 Quovia 品牌名称，并恢复彩虹折线图标。",
+      "欢迎页改为更简洁的白色布局，输入框顶部加入细彩虹装饰线。",
+      "同步更新 Android 应用名称、网页标题和更新提示。"
+    ],
+    "en-US": [
+      "The app now uses the Quovia brand name with the restored rainbow mark.",
+      "The welcome screen is simplified with a clean white layout and a fine rainbow accent on the composer.",
+      "Android labels, the web title, and update prompts now use the same brand."
+    ]
+  },
+  {
     "version": "0.1.3",
     "zh-CN": [
       "支持按住说话，松开后将识别文字填入草稿。Android 优先使用系统语音识别，并显示麦克风授权、录音和转写状态。",

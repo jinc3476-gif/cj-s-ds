@@ -1,4 +1,4 @@
-# 简聊应用内更新与 GitHub Releases
+# Quovia 应用内更新与 GitHub Releases
 
 ## 当前配置
 
@@ -18,7 +18,7 @@ APK 使用对应版本 Release 的固定下载地址。公开 Release 可匿名�
 2. 运行 ./scripts/build.ps1。该脚本构建前端和 APK，运行单元测试、lint，并检查 APK 签名、包名和版本。
 3. 运行 node scripts/prepare-release.mjs --repo jinc3476-gif/cj-s-ds。
 4. 在仓库页面进入 Releases，点击 Draft a new release。
-5. Tag 使用 `v<versionName>`，标题使用“简聊 <versionName>”。把 `artifacts/releases/<versionName>-<versionCode>/` 目录里的全部文件作为附件上传。
+5. Tag 使用 `v<versionName>`，标题使用“Quovia <versionName>”。把 `artifacts/releases/<versionName>-<versionCode>/` 目录里的全部文件作为附件上传。
 6. 不要勾选 Pre-release。确认附件上传完成后，点击 Publish release，并确认该版本显示为 Latest。
 7. 打开上面的 latest.json 地址，确认它返回 JSON。检查 JSON 里的 APK 地址可以访问。
 8. 将生成的 APK 覆盖安装到手机。不要先卸载旧版，以保留本地聊天和设置。

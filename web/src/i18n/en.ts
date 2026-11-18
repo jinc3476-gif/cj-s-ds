@@ -14,7 +14,7 @@ export const en = {
     'Chats or attachments have not been saved locally. Retry before closing this page.',
   sessionDeleteFailed: 'Unable to delete this chat. Please try again.',
   settings: 'Settings',
-  appName: 'Jianliao',
+  appName: 'Quovia',
   welcomeSubtitle: 'A quiet space for questions, documents, and ideas.',
   welcomeIdea: 'Help me explore an idea',
   welcomeRead: 'Read a document with me',
@@ -30,7 +30,7 @@ export const en = {
   appUpdateUnavailable: 'Version {version} · Update service is not enabled yet',
   appUpdateAndroidOnly: 'Version {version} · Check for updates in the Android app',
   openSourceDescription:
-    'Jianliao {version} · An independent client based on DeepSeek chat-demo (MIT). Not an official DeepSeek app.',
+    'Quovia {version} · An independent client based on DeepSeek chat-demo (MIT). Not an official DeepSeek app.',
   deleteSessionModalContentTitle: 'Delete chat?',
   deleteSessionWithFilesDescription:
     'This chat and its uploaded files will be permanently deleted and cannot be recovered. Delete this chat?',

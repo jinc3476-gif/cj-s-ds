@@ -1,7 +1,7 @@
 {
   "name": "jianliao",
   "version": "0.1.0",
-  "description": "简聊：使用个人 DeepSeek API Key 的独立 Android 聊天客户端。",
+  "description": "Quovia：使用个人 DeepSeek API Key 的独立 Android 聊天客户端。",
   "license": "MIT",
   "private": true,
   "type": "module",

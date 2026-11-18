@@ -11,7 +11,7 @@ export const zh = {
   sessionSaveFailed: '对话或附件尚未保存到本机，关闭页面可能丢失，请重试',
   sessionDeleteFailed: '删除对话失败，请重试',
   settings: '设置',
-  appName: '简聊',
+  appName: 'Quovia',
   welcomeSubtitle: '一个安静的空间，聊问题、读文件、找灵感。',
   welcomeIdea: '帮我梳理一个想法',
   welcomeRead: '一起读懂一份资料',
@@ -27,7 +27,7 @@ export const zh = {
   appUpdateUnavailable: '当前版本 {version} · 更新服务尚未启用',
   appUpdateAndroidOnly: '当前版本 {version} · 请在 Android 应用中检查更新',
   openSourceDescription:
-    '简聊 {version} · 独立第三方客户端。基于 DeepSeek chat-demo（MIT）修改，不代表 DeepSeek 官方。',
+    'Quovia {version} · 独立第三方客户端。基于 DeepSeek chat-demo（MIT）修改，不代表 DeepSeek 官方。',
   deleteSessionModalContentTitle: '永久删除对话',
   deleteSessionWithFilesDescription: '删除后，该对话及其中上传的文件将不可恢复。确认删除吗？',
   cancel: '取消',

@@ -9,7 +9,7 @@ const result = spawnSync(process.execPath, [cli, 'build', '-c', 'rspack.config.t
 })
 if (result.status !== 0) process.exit(result.status ?? 1)
 // Include the actual dependency license texts alongside the upstream MIT notice.
-let notices = '简聊 — third-party notices\n\nUpstream: https://github.com/deepseek-ai/chat-demo\n\n' + readFileSync(resolve(web, 'LICENSE'), 'utf8')
+let notices = 'Quovia — third-party notices\n\nUpstream: https://github.com/deepseek-ai/chat-demo\n\n' + readFileSync(resolve(web, 'LICENSE'), 'utf8')
 const seen = new Set()
 function collect(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

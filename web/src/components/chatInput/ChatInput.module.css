@@ -2,6 +2,7 @@
   --line-height: 1.5em;
   --input-padding-top: 14px;
   --control-size: 40px;
+  position: relative;
   container-type: inline-size;
   display: flex;
   flex-direction: column;
@@ -14,6 +15,16 @@
   border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
   background: var(--dsw-specific-input-major);
   overflow: hidden;
+}
+
+.wrapper::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  height: 2px;
+  background: linear-gradient(90deg, #4e67ed 0%, #8b6be5 24%, #e681a7 48%, #f3bd64 72%, #5cbdb2 100%);
+  pointer-events: none;
 }
 
 .session {

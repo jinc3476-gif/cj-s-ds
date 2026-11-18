@@ -1,4 +1,4 @@
-简聊 — third-party notices
+Quovia — third-party notices
 
 Upstream: https://github.com/deepseek-ai/chat-demo
 

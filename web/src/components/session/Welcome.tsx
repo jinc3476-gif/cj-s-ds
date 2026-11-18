@@ -13,10 +13,6 @@ export const Welcome = () => {
       {isMobile ? <MobileHeader /> : null}
       <div className={styles.welcome}>
         <div className={styles.intro}>
-          <div className={styles.mark} aria-hidden="true">
-            <span />
-            <span />
-          </div>
           <div className={styles.greeting}>{t('welcomeMessageChat250808')}</div>
           <p className={styles.subtitle}>{t('welcomeSubtitle')}</p>
           <div className={styles.suggestions}>

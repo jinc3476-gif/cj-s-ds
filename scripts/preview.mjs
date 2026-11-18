@@ -15,4 +15,4 @@ export const server = createServer((req, res) => {
     createReadStream(file).pipe(res)
   } catch { res.writeHead(404).end() }
 })
-server.listen(Number(process.env.PORT ?? 8090), '127.0.0.1', () => console.log('简聊 preview: http://127.0.0.1:' + server.address().port))
+server.listen(Number(process.env.PORT ?? 8090), '127.0.0.1', () => console.log('Quovia preview: http://127.0.0.1:' + server.address().port))

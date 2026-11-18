@@ -9,4 +9,4 @@
 
 本项目通过官方仓库源码压缩包导入并修改；未在用户 GitHub 账号下创建远程 Fork。
 web/src 保留官方的流式 Messages、Files、ASR、TTS、搜索引用及 IndexedDB 会话逻辑。
-新增简聊品牌、手机首页、简化设置、Android WebView 封装、Keystore API Key 存储与系统文件导入导出。
+新增 Quovia 品牌、手机首页、简化设置、Android WebView 封装、Keystore API Key 存储与系统文件导入导出。
