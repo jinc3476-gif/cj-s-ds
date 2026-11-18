@@ -27,6 +27,8 @@ declare const styles: {
   readonly "description": string;
   readonly "error": string;
   readonly "apiKey": string;
+  readonly "platform": string;
+  readonly "platformRow": string;
   readonly "apiKeySaved": string;
   readonly "apiKeyInput": string;
   readonly "apiKeyMask": string;

@@ -20,10 +20,13 @@
 .wrapper::before {
   content: '';
   position: absolute;
-  inset: 0 0 auto;
+  inset: 0 16px auto;
   z-index: 1;
   height: 2px;
-  background: linear-gradient(90deg, #4e67ed 0%, #8b6be5 24%, #e681a7 48%, #f3bd64 72%, #5cbdb2 100%);
+  clip-path: ellipse(50% 50% at center);
+  -webkit-mask-image: var(--quovia-line-fade);
+  mask-image: var(--quovia-line-fade);
+  background: var(--quovia-spectrum);
   pointer-events: none;
 }
 
@@ -312,6 +315,20 @@
 
     &:hover {
       background-color: var(--dsw-alias-button-ghost-active-hover);
+    }
+
+    @media (forced-colors: none) {
+      --toggle-surface: var(--dsw-specific-input-major);
+      border-color: transparent;
+      background: linear-gradient(var(--toggle-surface), var(--toggle-surface)) padding-box,
+        var(--quovia-spectrum) border-box;
+      font-weight: 600;
+
+      @media (hover: hover) {
+        &:hover {
+          --toggle-surface: var(--dsw-alias-bg-skeleton);
+        }
+      }
     }
   }
 }

@@ -52,6 +52,8 @@ const describeError = (error: unknown): TranslationKey => {
 type Session = {
   id: string
   native: boolean
+  starting: boolean
+  startupTimer?: number
   recording?: Recording
   controller: AbortController
 }
@@ -75,6 +77,7 @@ export const useVoiceInput = (onText: (text: string) => void) => {
   const cancel = useCallback(() => {
     const session = active.current
     active.current = null
+    window.clearTimeout(session?.startupTimer)
     if (session?.native) {
       window.AndroidBridge?.cancelNativeSpeech?.(session.id)
     }
@@ -86,6 +89,10 @@ export const useVoiceInput = (onText: (text: string) => void) => {
   const finish = useCallback(async () => {
     const session = active.current
     if (!session) {
+      return
+    }
+    if (session.starting) {
+      cancel()
       return
     }
     if (session.native) {
@@ -151,10 +158,16 @@ export const useVoiceInput = (onText: (text: string) => void) => {
         return
       }
     }
-    const session: Session = { id: createId(), native, controller: new AbortController() }
+    const session: Session = { id: createId(), native, starting: true, controller: new AbortController() }
     active.current = session
     setSeconds(0)
     setStatus('starting')
+    // Both permission prompts and bridge calls can remain pending without an error.
+    session.startupTimer = window.setTimeout(() => {
+      if (active.current !== session || !session.starting) return
+      cancel()
+      showToast({ key: 'voiceInputStartTimeout' })
+    }, 18_000)
     try {
       if (native) {
         bridge?.startNativeSpeech?.(session.id, useSettings.getState().locale)
@@ -171,6 +184,8 @@ export const useVoiceInput = (onText: (text: string) => void) => {
         return
       }
       session.recording = recording
+      session.starting = false
+      window.clearTimeout(session.startupTimer)
       setStatus('recording')
     } catch (error) {
       if (active.current === session) {
@@ -186,6 +201,8 @@ export const useVoiceInput = (onText: (text: string) => void) => {
       if (!detail || !active.current?.native || active.current.id !== detail.id) {
         return
       }
+      window.clearTimeout(active.current.startupTimer)
+      active.current.starting = false
       if (detail.state === 'recording' || detail.state === 'transcribing') {
         setStatus(detail.state)
         return

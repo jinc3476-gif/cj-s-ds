@@ -18,7 +18,7 @@ export const MobileHeader = ({ title }: { title?: string }) => {
         aria-label={t('expandSiderbarButton')}
         onClick={openMobileSider}
       />
-      <div className={styles.title}>{title ?? t('appName')}</div>
+      <div className={styles.title}>{title ?? <span className="quovia-wordmark">{t('appName')}</span>}</div>
       {title !== undefined ? (
         <IconButton
           size="xl"

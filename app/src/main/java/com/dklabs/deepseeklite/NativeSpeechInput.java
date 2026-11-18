@@ -32,7 +32,11 @@ final class NativeSpeechInput {
     }
 
     void refreshAvailability() {
-        available = SpeechRecognizer.isRecognitionAvailable(activity);
+        available = SpeechRecognizer.isRecognitionAvailable(activity) || onDeviceAvailable();
+    }
+
+    private boolean onDeviceAvailable() {
+        return android.os.Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(activity);
     }
 
     boolean available() { return available; }
@@ -95,14 +99,16 @@ final class NativeSpeechInput {
 
         void listen() {
             try {
-                recognizer = SpeechRecognizer.createSpeechRecognizer(activity);
+                recognizer = android.os.Build.VERSION.SDK_INT >= 31 && !SpeechRecognizer.isRecognitionAvailable(activity) && onDeviceAvailable()
+                        ? SpeechRecognizer.createOnDeviceSpeechRecognizer(activity)
+                        : SpeechRecognizer.createSpeechRecognizer(activity);
                 recognizer.setRecognitionListener(this);
                 Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                         .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                         .putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
                         .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
                 recognizer.startListening(intent);
-                deadline(15_000, () -> fail("unavailable"));
+                deadline(8_000, () -> fail("unavailable"));
             } catch (SecurityException error) {
                 fail("permission");
             } catch (RuntimeException error) {
@@ -171,7 +177,9 @@ final class NativeSpeechInput {
 
         @Override public void onBeginningOfSpeech() { onReadyForSpeech(null); }
         @Override public void onRmsChanged(float rms) {}
-        @Override public void onBufferReceived(byte[] buffer) {}
+        @Override public void onBufferReceived(byte[] buffer) {
+            if (buffer != null && buffer.length > 0) onReadyForSpeech(null);
+        }
         @Override public void onPartialResults(Bundle partial) {}
         @Override public void onEvent(int event, Bundle params) {}
     }

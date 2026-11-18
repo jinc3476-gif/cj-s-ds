@@ -86,6 +86,23 @@ try {
   }
   console.log('PASS Holding the text field or mic records; release transcribes exactly once')
 
+  const mic = await button('语音输入').boundingBox()
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: mic.x + mic.width / 2, y: mic.y + mic.height / 2 }] })
+  await visible(button('取消打开麦克风'))
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await visible(button('语音输入'))
+  assert.equal(await page.evaluate(() => window.voiceCalls.at(-1)[0]), 'cancel')
+  console.log('PASS Releasing during startup requires no acknowledgement from the native bridge')
+
+  await page.clock.install()
+  await button('语音输入').click()
+  await visible(button('取消打开麦克风'))
+  await page.clock.fastForward(18_001)
+  await visible(button('语音输入'))
+  await page.evaluate(() => window.emitSpeech('result', { text: '迟到的结果' }))
+  assert.equal(await draft.inputValue(), '')
+  console.log('PASS A silent native bridge times out and ignores late results')
+
   await button('语音输入').click()
   await button('取消打开麦克风').click()
   await page.evaluate(() => window.emitSpeech('result', { text: '迟到的结果' }))
@@ -112,6 +129,24 @@ try {
     await draft.fill('')
   }
   assert.equal(asrUploads, 2)
+  await page.evaluate(() => {
+    const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices)
+    navigator.mediaDevices.getUserMedia = () => new Promise(resolve => {
+      window.allowLateMicrophone = async () => {
+        const stream = await original({ audio: true })
+        window.lateTrack = stream.getAudioTracks()[0]
+        resolve(stream)
+      }
+    })
+  })
+  await button('语音输入').click()
+  await visible(button('取消打开麦克风'))
+  await page.clock.fastForward(18_001)
+  await visible(button('语音输入'))
+  await page.evaluate(() => window.allowLateMicrophone())
+  await page.waitForFunction(() => window.lateTrack.readyState === 'ended')
+  assert.equal(asrUploads, 2)
+  console.log('PASS An unanswered web permission prompt times out; a late stream is stopped without upload')
   assert.deepEqual(errors, [])
   console.log('PASS Missing and broken native services fall back to a validated WAV upload')
 } finally {

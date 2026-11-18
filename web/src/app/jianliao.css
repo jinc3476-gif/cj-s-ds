@@ -1,4 +1,8 @@
 body {
+  --quovia-stops: #4e67ed, #8b6be5 24%, #e681a7 48%, #f3bd64 72%, #5cbdb2;
+  --quovia-spectrum: linear-gradient(90deg, var(--quovia-stops));
+  --quovia-line-fade: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+  --quovia-wordmark: linear-gradient(90deg, #424eb2, #7949a3 26%, #a23f70 50%, #925113 73%, #20756e);
   --dsw-static-blue-500: #205447;
   --dsw-static-blue-450: #2d6658;
   --dsw-static-blue-400: #3f7b69;
@@ -9,17 +13,20 @@ body {
   --dsw-static-blue-600: #447562;
   --dsw-static-blue-800: #315342;
   --dsw-static-blue-900: #233a2d;
-  --dsw-alias-bg-base: #f7f6f2;
-  --dsw-alias-bg-layer-2: #fffefa;
-  --dsw-alias-bg-layer-3: #fffefa;
-  --dsw-alias-bg-skeleton: #eeede7;
-  --dsw-alias-label-primary: #242821;
-  --dsw-alias-label-secondary: #63675f;
-  --dsw-alias-label-tertiary: #878a80;
-  --dsw-specific-input-major: #fffefa;
+  --dsw-alias-bg-base: #fff;
+  --dsw-alias-bg-layer-2: #fff;
+  --dsw-alias-bg-layer-3: #fff;
+  --dsw-alias-bg-skeleton: #eee;
+  --dsw-alias-label-primary: #252629;
+  --dsw-alias-label-secondary: #606368;
+  --dsw-alias-label-tertiary: #71757a;
+  --dsw-specific-input-major: #fff;
+  --dsw-specific-bubble: #f3f3f4;
+  --dsw-specific-sidebar-nav-item-active-accent: #e8e8ea;
   -webkit-tap-highlight-color: transparent;
 }
 body[data-ds-dark-theme] {
+  --quovia-wordmark: var(--quovia-spectrum);
   --dsw-static-blue-300: #628a74;
   --dsw-static-blue-200: #b1d2bd;
   --dsw-static-blue-500: #99c6ad;
@@ -38,6 +45,19 @@ body[data-ds-dark-theme] {
   --dsw-alias-label-secondary: #b3baaf;
   --dsw-alias-label-tertiary: #8c9689;
   --dsw-specific-input-major: #232a23;
+  --dsw-specific-bubble: #303033;
+  --dsw-specific-sidebar-nav-item-active-accent: #39393c;
+}
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  @media (forced-colors: none) {
+    .quovia-wordmark {
+      background-image: var(--quovia-wordmark);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      font-weight: 600;
+    }
+  }
 }
 button,
 input,

@@ -13,7 +13,18 @@
 
   &.active {
     background-color: var(--dsw-specific-sidebar-nav-item-active-accent);
-    color: var(--dsw-alias-brand-primary-invert);
+    color: var(--dsw-alias-label-primary);
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset-inline-start: 3px;
+      top: calc(50% - 8px);
+      width: 3px;
+      height: 16px;
+      border-radius: 2px;
+      background: linear-gradient(var(--quovia-stops));
+    }
   }
 
   @media (hover: hover) {

@@ -89,8 +89,17 @@ const SettingsContent = () => {
                 {section === 'account' && (
                   <>
                     <ApiKeyField editor={apiKeyEditor} />
-                    <div className={styles.description}>{t('apiProviderNote')}</div>
                     {isMobile ? <ApiKeyConfirm editor={apiKeyEditor} /> : null}
+                    <section className={styles.platform}>
+                      <h2>{t('platformTitle')}</h2>
+                      <div className={styles.platformRow}>
+                        <a href="https://platform.deepseek.com/sign_in" target="_blank" rel="noreferrer">{t('platformLogin')}</a>
+                        <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer">{t('platformKeys')}</a>
+                        <a href="https://platform.deepseek.com/top_up" target="_blank" rel="noreferrer">{t('platformBalance')}</a>
+                      </div>
+                      <p>{t('platformHelp')}</p>
+                    </section>
+                    <div className={styles.description}>{t('apiProviderNote')}</div>
                   </>
                 )}
                 {section === 'appearance' && <ThemeSetting />}

@@ -48,7 +48,7 @@ const ReleaseHistoryDialog = ({ onClose }: { onClose: () => void }) => {
       {history.map((release) => (
         <section key={release.version} className={styles.release}>
           <h3>
-            v{release.version}{' '}
+            <span className={release.version === __APP_VERSION__ ? 'quovia-wordmark' : undefined}>v{release.version}</span>{' '}
             {release.version === __APP_VERSION__ && <small>{t('installedVersion')}</small>}
           </h3>
           <ul>

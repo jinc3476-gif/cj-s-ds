@@ -43,7 +43,9 @@ public class MainActivity extends Activity {
             if (isAppPage()) web.evaluateJavascript(
                     "window.dispatchEvent(new CustomEvent('jianliao-speech',{detail:" + event + "}))", null);
         });
-        web.setBackgroundColor(0xFFF7F6F2);
+        web.setBackgroundColor(android.graphics.Color.WHITE);
+        getWindow().getDecorView().setSystemUiVisibility(getWindow().getDecorView().getSystemUiVisibility()
+                | android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);

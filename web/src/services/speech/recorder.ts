@@ -21,9 +21,7 @@ export const startRecording = async (onLimit: () => void, signal: AbortSignal): 
   if (signal.aborted) {
     throw new DOMException('Cancelled', 'AbortError')
   }
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
-  })
+  let stream: MediaStream | undefined
   let context: AudioContext | undefined
   let source: MediaStreamAudioSourceNode | undefined
   let processor: ScriptProcessorNode | undefined
@@ -46,18 +44,27 @@ export const startRecording = async (onLimit: () => void, signal: AbortSignal): 
         // 继续释放其余资源。
       }
     }
-    for (const track of stream.getTracks()) {
+    for (const track of stream?.getTracks() ?? []) {
       track.stop()
     }
     void context?.close().catch(() => {})
   }
 
   try {
-    if (signal.aborted) {
-      throw new DOMException('Cancelled', 'AbortError')
-    }
     signal.addEventListener('abort', release, { once: true })
     context = new AudioContext()
+    // Request playback activation during the gesture, before a permission dialog can consume it.
+    const resumed = context.state === 'suspended' ? context.resume() : Promise.resolve()
+    await Promise.all([resumed, navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+    }).then((media) => {
+      if (released) {
+        for (const track of media.getTracks()) track.stop()
+        throw new DOMException('Cancelled', 'AbortError')
+      }
+      stream = media
+    })])
+    if (signal.aborted || !stream) throw new DOMException('Cancelled', 'AbortError')
     const rate = context.sampleRate
     source = context.createMediaStreamSource(stream)
     processor = context.createScriptProcessor(BUFFER_SIZE, 1, 1)
@@ -78,11 +85,6 @@ export const startRecording = async (onLimit: () => void, signal: AbortSignal): 
     source.connect(processor)
     // ScriptProcessorNode 只有连到输出才会持续回调；输出缓冲保持静音
     processor.connect(context.destination)
-    // 在 await getUserMedia 之后创建，iOS 上可能处于 suspended
-    if (context.state === 'suspended') {
-      await context.resume()
-    }
-
     return {
       stop: async () => {
         release()

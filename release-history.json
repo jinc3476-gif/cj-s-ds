@@ -1,5 +1,18 @@
 [
   {
+    "version": "0.1.5",
+    "zh-CN": [
+      "浅色首页改为纯白，仅保留「想法，从这里开始」。Quovia 字标沿用输入框的彩虹配色。",
+      "调整语音识别启动与取消流程，麦克风无响应时可退出并重试。",
+      "账号管理新增 DeepSeek 开放平台注册、创建密钥和充值入口。"
+    ],
+    "en-US": [
+      "A white welcome screen with a single greeting and a spectrum-colored Quovia wordmark.",
+      "Microphone startup and cancellation now recover when a speech service does not respond.",
+      "Account settings now link to DeepSeek registration, API keys and top-ups."
+    ]
+  },
+  {
     "version": "0.1.4",
     "zh-CN": [
       "应用正式使用 Quovia 品牌名称，并恢复彩虹折线图标。",

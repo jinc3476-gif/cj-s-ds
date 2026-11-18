@@ -107,6 +107,13 @@ try {
   })
   await check('拒绝无效 Key；有效 Key 校验后保存至原生桥接', async () => {
     const keyInput = page.locator('input[type=password]')
+    for (const [label, path] of [['注册 / 登录', 'sign_in'], ['创建 API Key', 'api_keys'], ['充值', 'top_up']]) {
+      const link = page.getByRole('link', { name: label, exact: true })
+      await visible(link)
+      assert.equal(await link.getAttribute('href'), `https://platform.deepseek.com/${path}`)
+      assert.equal(await link.getAttribute('target'), '_blank')
+    }
+    await page.screenshot({ path: resolve(output, 'account-review.png') })
     await keyInput.fill('sk-invalid-synthetic')
     await page.getByRole('button', { name: '确定', exact: true }).click()
     await visible(page.getByText('API Key 无效，请检查后重试', { exact: true }))
@@ -137,12 +144,13 @@ try {
     } finally { await context.setOffline(false) }
     await page.locator('textarea').fill('')
   })
-  await check('手机首页及快捷提问可用', async () => {
-    await visible(page.getByText('想法，从这里开始。', { exact: true }))
+  await check('手机首页为纯白色，仅显示一句问候', async () => {
+    await visible(page.getByRole('heading', { name: '想法，从这里开始', exact: true }))
+    assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(255, 255, 255)')
+    assert.equal(await page.getByText('帮我梳理一个想法', { exact: false }).count(), 0)
     await noOverflow()
     await page.screenshot({ path: resolve(output, '02-home.png') })
-    await page.getByRole('button', { name: '帮我梳理一个想法' }).click()
-    assert.equal(await page.locator('textarea').inputValue(), '帮我梳理一个想法')
+    await page.locator('textarea').fill('帮我梳理一个想法')
   })
   await check('官方 Messages 流式协议与搜索声明', async () => {
     await page.getByRole('button', { name: '智能搜索', exact: true }).click()
@@ -193,6 +201,10 @@ try {
   })
   await check('返回键关闭侧栏，历史可导出到原生保存器', async () => {
     await page.getByRole('button', { name: '打开边栏', exact: true }).click()
+    const current = page.locator('[aria-current="page"]:visible')
+    await visible(current)
+    assert.match(await current.evaluate(el => getComputedStyle(el, '::before').backgroundImage), /linear-gradient/)
+    await page.screenshot({ path: resolve(output, 'spectrum-sidebar.png'), animations: 'disabled' })
     assert.equal(await page.evaluate(() => window.handleAndroidBack()), true)
     await page.getByRole('button', { name: '打开边栏', exact: true }).click()
     await page.getByRole('button', { name: '设置', exact: true }).click()
@@ -208,12 +220,13 @@ try {
     await button('返回').click()
     await setting('appearance').click()
     await page.getByRole('radio', { name: '深色', exact: true }).click()
+    await page.screenshot({ path: resolve(output, 'spectrum-theme.png'), animations: 'disabled' })
     await button('返回').click()
     await page.getByRole('button', { name: '关闭', exact: true }).click()
     await page.setViewportSize({ width: 390, height: 844 })
     await page.getByRole('button', { name: '打开边栏', exact: true }).click()
     await page.getByRole('button', { name: '开启新对话', exact: true }).first().click()
-    await visible(page.getByText('想法，从这里开始。', { exact: true }))
+    await visible(page.getByRole('heading', { name: '想法，从这里开始', exact: true }))
     await page.screenshot({ path: resolve(output, '05-dark-home.png') })
     await noOverflow()
   })

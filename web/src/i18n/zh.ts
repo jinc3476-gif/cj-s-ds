@@ -1,5 +1,5 @@
 export const zh = {
-  welcomeMessageChat250808: '想法，从这里开始。',
+  welcomeMessageChat250808: '想法，从这里开始',
   contentCaveat: '内容由 AI 生成，请仔细甄别',
   expandSiderbarButton: '打开边栏',
   collapseSiderbarButton: '收起边栏',
@@ -12,10 +12,12 @@ export const zh = {
   sessionDeleteFailed: '删除对话失败，请重试',
   settings: '设置',
   appName: 'Quovia',
-  welcomeSubtitle: '一个安静的空间，聊问题、读文件、找灵感。',
-  welcomeIdea: '帮我梳理一个想法',
-  welcomeRead: '一起读懂一份资料',
-  welcomeWrite: '帮我把表达写清楚',
+  platformTitle: 'DeepSeek 开放平台',
+  platformLogin: '注册 / 登录',
+  platformKeys: '创建 API Key',
+  platformBalance: '充值',
+  platformHelp: '在 DeepSeek 开放平台注册或登录，创建 API Key 后回到这里粘贴并确认。需要充值时，可前往平台管理余额。',
+  voiceInputStartTimeout: '麦克风未响应，请检查麦克风权限后重试',
   apiProviderNote:
     '使用你自己的 DeepSeek API Key 连接，费用由该 API 账户承担。Android 应用在本机加密保存密钥；网页版使用浏览器本地存储。',
   openSourceNotice: '关于与开源许可',

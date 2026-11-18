@@ -50,6 +50,7 @@ export const SessionItem = memo(function SessionItem({
   return (
     <div
       className={clsx(styles.item, active && styles.active)}
+      aria-current={active ? 'page' : undefined}
       onClick={() => {
         selectSession(session.id)
         closeMobileSider()
