@@ -1,10 +1,9 @@
-import { closeSettings, useSettingsDialog } from '../components/settings/settingsDialogState.js'
+import { goBackFromModal } from '../components/base/Modal.js'
 import { closeMobileSider, useMobileSider } from '../components/sider/mobileSiderState.js'
 import { closeSearchPanel, useSearchPanel } from '../components/search/searchPanelState.js'
 
 window.handleAndroidBack = () => {
-  if (useSettingsDialog.getState().open) {
-    closeSettings()
+  if (goBackFromModal()) {
     return true
   }
   if (useMobileSider.getState().open) {

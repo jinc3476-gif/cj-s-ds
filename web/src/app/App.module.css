@@ -32,6 +32,13 @@
   font-size: 14px;
 }
 
+.updates {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 12px;
+}
+
 .loadingView {
   position: absolute;
   inset: 0;

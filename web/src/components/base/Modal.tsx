@@ -2,12 +2,18 @@ import clsx from 'clsx'
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslate } from '../../i18n/index.js'
-import { IconCloseOutline16 } from './icons.js'
+import { IconChevronRightOutline14, IconCloseOutline16 } from './icons.js'
 import { IconButton } from './IconButton.js'
 import styles from './Modal.module.css'
 
 /** 当前打开的弹窗，后打开的在末尾；叠放时 Esc 只关闭最上层 */
-const openModals: object[] = []
+const openModals: { close: () => void }[] = []
+
+export const goBackFromModal = (): boolean => {
+  const top = openModals.at(-1)
+  top?.close()
+  return !!top
+}
 
 /** 遮罩 + 居中卡片，Esc / 点遮罩关闭 */
 export const Modal = ({
@@ -15,6 +21,7 @@ export const Modal = ({
   children,
   footer,
   closable = false,
+  backLabel,
   className,
   mainClassName,
   onClose,
@@ -24,6 +31,7 @@ export const Modal = ({
   footer?: ReactNode
   /** 标题栏右侧显示关闭按钮 */
   closable?: boolean
+  backLabel?: string
   className?: string
   /** 内容区的 class */
   mainClassName?: string
@@ -34,7 +42,7 @@ export const Modal = ({
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
   useEffect(() => {
-    const token = {}
+    const token = { close: () => onCloseRef.current() }
     openModals.push(token)
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && openModals.at(-1) === token) {
@@ -59,7 +67,17 @@ export const Modal = ({
         aria-modal="true"
         aria-labelledby={titleId}
       >
-        <div className={styles.header}>
+        <div className={clsx(styles.header, backLabel && styles.pageHeader)}>
+          {backLabel ? (
+            <IconButton
+              size="xl"
+              tone="primary"
+              className={styles.back}
+              icon={<IconChevronRightOutline14 />}
+              aria-label={backLabel}
+              onClick={onClose}
+            />
+          ) : null}
           <div id={titleId} className={styles.title}>
             {title}
           </div>

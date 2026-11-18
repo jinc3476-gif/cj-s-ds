@@ -1,73 +1,131 @@
-.dialog {
-  --modal-header-gap: 7px;
-  width: 760px;
-  height: 500px;
-  max-height: calc(100vh - 32px);
-  padding: 19px 24px 22px;
+.dialog.dialog {
+  --settings-background: #f7f8fa;
+  --settings-surface: #fff;
+  width: 540px;
+  height: min(820px, calc(100% - 48px));
+  padding: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background-color: var(--settings-background);
+}
+
+:global([data-ds-dark-theme]) .dialog {
+  --settings-background: #191d19;
+  --settings-surface: var(--dsw-alias-bg-layer-2);
 }
 
 .dialogMain {
   display: flex;
   flex: 1;
   min-height: 0;
-  color: var(--dsw-alias-label-primary);
-}
-
-.navigation {
-  display: flex;
   flex-direction: column;
-  flex-shrink: 0;
-  gap: 4px;
-  width: 172px;
-  margin: 6px 12px 0 -12px;
-  padding-top: 4px;
-}
-
-.navItem {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-sizing: border-box;
-  width: calc(100% - 8px);
-  min-height: 40px;
-  margin: 0 4px;
-  padding: 9px 10px 9px 8px;
-  border: none;
-  border-radius: 12px;
-  background-color: transparent;
   color: var(--dsw-alias-label-primary);
-  font: inherit;
-  font-size: 14px;
-  line-height: 22px;
-  text-align: left;
-  cursor: pointer;
-  user-select: none;
-  outline: none;
-  transition: background-color var(--ds-transition-duration) var(--ds-ease-in-out);
-
-  svg {
-    flex-shrink: 0;
-  }
-
-  &:hover,
-  &.navItemActive {
-    background-color: var(--dsw-alias-interactive-bg-hover);
-  }
-
-  &:focus-visible {
-    box-shadow: 0 0 0 2px var(--dsw-alias-button-primary-fill);
-  }
 }
 
 .content {
-  display: flex;
-  flex: 1 0 0;
-  flex-direction: column;
+  flex: 1;
   min-width: 0;
   min-height: 0;
-  margin-right: -24px;
-  padding: 0 24px;
+  padding: 15px max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
   overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.group + .group {
+  margin-top: 18px;
+}
+
+.group h2 {
+  margin: 0 5px 8px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.list,
+.detail {
+  border-radius: 8px;
+  background: var(--settings-surface);
+}
+
+.list {
+  overflow: hidden;
+}
+
+.listRow {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) minmax(0, auto) 12px;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 55px;
+  padding: 10px 15px;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 17px;
+  line-height: 1.4;
+  text-align: start;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.listRow + .listRow {
+  border-top: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+}
+
+.listRow:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .listRow:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.rowIcon,
+.chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rowIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.rowValue,
+.chevron {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.rowValue {
+  max-width: 150px;
+  text-align: end;
+  font-size: 15px;
+}
+
+.detail {
+  padding: 4px 16px 12px;
+}
+
+.privacy {
+  color: var(--dsw-alias-label-primary);
+  line-height: 1.7;
+}
+
+.privacy h2 {
+  font-size: 16px;
+}
+
+.privacy a {
+  color: var(--dsw-alias-brand-text);
 }
 
 .cell {
@@ -289,48 +347,11 @@
 }
 
 @media not all and (min-width: 768px) {
-  .dialog {
-    align-self: flex-end;
+  .dialog.dialog {
     width: 100%;
     max-width: none;
-    height: calc(100% - 64px);
-    max-height: 800px;
-    border-radius: 24px 24px 0 0;
-  }
-
-  .dialogMain {
-    flex-direction: column;
-  }
-
-  .navigation {
-    flex-direction: row;
-    width: auto;
-    margin: 6px -4px;
-    padding: 4px 0;
-    overflow-x: auto;
-  }
-
-  .navItem {
-    flex: 1 0 auto;
-    justify-content: center;
-    width: auto;
-    min-width: 108px;
-    margin: 0;
-    white-space: nowrap;
-
-    &:first-child {
-      margin-left: 4px;
-    }
-
-    &:last-child {
-      margin-right: 4px;
-    }
-  }
-
-  .content {
-    padding-top: 24px;
-    padding-left: 0;
-    padding-bottom: env(safe-area-inset-bottom);
+    height: 100%;
+    border-radius: 0;
   }
 
   .text {

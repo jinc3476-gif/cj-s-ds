@@ -1,152 +1,231 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { TranslationMessage } from '../../i18n/index.js'
+import type { TranslationKey } from '../../i18n/index.js'
+import { ApiError } from '../../services/api/client.js'
+import { classifyApiError } from '../../services/api/errors.js'
 import { transcribe } from '../../services/api/speech.js'
 import { startRecording, type Recording } from '../../services/speech/recorder.js'
 import { useSettings } from '../../services/settings.js'
+import { createId } from '../../utils/id.js'
 import { showToast } from '../base/toastState.js'
+import { ensureApiKey } from '../settings/settingsDialogState.js'
 
-export type VoiceInputStatus = 'idle' | 'recording' | 'transcribing'
-
-/**
- * 录音依赖 getUserMedia，只在安全上下文可用（HTTPS、localhost、file://）。
- * 普通 HTTP 页面上直接禁用入口，避免点击后必然失败。
- */
-const AVAILABLE = typeof window === 'undefined' || window.isSecureContext
-
-const describeRecordingError = (error: unknown): TranslationMessage => {
+export type VoiceInputStatus = 'idle' | 'starting' | 'recording' | 'transcribing'
+type NativeEvent = {
+  id: string
+  state: 'recording' | 'transcribing' | 'result' | 'error' | 'cancelled'
+  text?: string
+  error?: 'permission' | 'empty' | 'network' | 'unavailable' | 'failed'
+}
+const nativeErrors: Record<NonNullable<NativeEvent['error']>, TranslationKey> = {
+  permission: 'voiceInputPermissionDenied',
+  empty: 'voiceInputEmpty',
+  network: 'voiceInputNetwork',
+  unavailable: 'voiceInputUnavailable',
+  failed: 'voiceInputFailed',
+}
+const describeError = (error: unknown): TranslationKey => {
   if (error instanceof DOMException) {
     if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
-      return { key: 'voiceInputPermissionDenied' }
+      return 'voiceInputPermissionDenied'
     }
     if (error.name === 'NotFoundError') {
-      return { key: 'voiceInputNoDevice' }
+      return 'voiceInputNoDevice'
+    }
+    if (error.name === 'NotReadableError') {
+      return 'voiceInputDeviceBusy'
     }
   }
-  return { key: 'voiceInputFailed' }
+  if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+    return 'voiceInputServiceUnavailable'
+  }
+  switch (classifyApiError(error)) {
+    case 'unauthorized':
+      return 'voiceInputKeyInvalid'
+    case 'insufficientBalance':
+      return 'voiceInputBalance'
+    case 'network':
+      return 'voiceInputNetwork'
+    default:
+      return 'voiceInputFailed'
+  }
+}
+type Session = {
+  id: string
+  native: boolean
+  recording?: Recording
+  controller: AbortController
 }
 
-/**
- * 语音输入（oneshot）：点击开始录音，再次点击结束并转写，结果交给 onText 填入输入框。
- * 转写中再次点击取消。录满 120 秒自动结束。
- */
 export const useVoiceInput = (onText: (text: string) => void) => {
   const [status, setStatus] = useState<VoiceInputStatus>('idle')
-  /** 本次录音已录秒数，只在录音中递增 */
   const [seconds, setSeconds] = useState(0)
-  const recordingRef = useRef<Recording | null>(null)
-  const controllerRef = useRef<AbortController | null>(null)
-  const operationRef = useRef(0)
+  const active = useRef<Session | null>(null)
+  const nativeUnavailable = useRef(false)
   const onTextRef = useRef(onText)
   onTextRef.current = onText
 
-  const cancelOperation = useCallback(() => {
-    operationRef.current++
-    recordingRef.current?.cancel()
-    recordingRef.current = null
-    controllerRef.current?.abort()
-    controllerRef.current = null
+  const accept = useCallback((text?: string) => {
+    if (text?.trim()) {
+      onTextRef.current(text.trim())
+    } else {
+      showToast({ key: 'voiceInputEmpty' })
+    }
   }, [])
 
   const cancel = useCallback(() => {
-    cancelOperation()
+    const session = active.current
+    active.current = null
+    if (session?.native) {
+      window.AndroidBridge?.cancelNativeSpeech?.(session.id)
+    }
+    session?.controller.abort()
+    session?.recording?.cancel()
     setStatus('idle')
-  }, [cancelOperation])
+  }, [])
 
   const finish = useCallback(async () => {
-    const recording = recordingRef.current
+    const session = active.current
+    if (!session) {
+      return
+    }
+    if (session.native) {
+      window.AndroidBridge?.stopNativeSpeech?.(session.id)
+      return
+    }
+    const recording = session.recording
     if (!recording) {
-      // 仍在等待麦克风授权时也允许取消；迟到的录音对象会立即释放。
       cancel()
       return
     }
-    const operation = operationRef.current
-    recordingRef.current = null
-    let controller: AbortController | null = null
+    delete session.recording
+    setStatus('transcribing')
     try {
-      let audio: Blob | null
-      try {
-        audio = await recording.stop()
-      } finally {
-        recording.cancel()
-      }
-      if (operationRef.current !== operation || !audio) {
+      const audio = await recording.stop()
+      if (active.current !== session) {
         return
       }
-      controller = new AbortController()
-      controllerRef.current = controller
-      setStatus('transcribing')
-      const text = await transcribe(useSettings.getState().apiKey ?? '', audio, controller.signal)
-      if (controller.signal.aborted || operationRef.current !== operation) {
-        return
+      const text = audio
+        ? await transcribe(useSettings.getState().apiKey ?? '', audio, session.controller.signal)
+        : ''
+      if (active.current === session) {
+        accept(text)
       }
-      if (text.trim()) {
-        onTextRef.current(text.trim())
-      } else {
-        showToast({ key: 'voiceInputEmpty' })
-      }
-    } catch {
-      if (operationRef.current === operation && !controller?.signal.aborted) {
-        showToast({ key: 'voiceInputFailed' })
+    } catch (error) {
+      if (active.current === session) {
+        showToast({ key: describeError(error) })
       }
     } finally {
-      if (operationRef.current === operation) {
-        controllerRef.current = null
+      recording.cancel()
+      if (active.current === session) {
+        active.current = null
         setStatus('idle')
       }
     }
-  }, [cancel])
+  }, [accept, cancel])
 
-  const toggle = useCallback(async () => {
-    if (!AVAILABLE) {
+  const start = useCallback(async () => {
+    if (active.current) {
       return
     }
-    if (status === 'recording') {
-      await finish()
-      return
+    const bridge = window.AndroidBridge
+    const native =
+      !nativeUnavailable.current &&
+      Boolean(
+        bridge?.startNativeSpeech &&
+        bridge.stopNativeSpeech &&
+        bridge.cancelNativeSpeech &&
+        bridge.hasNativeSpeech?.()
+      )
+    if (!native) {
+      if (
+        !window.isSecureContext ||
+        !navigator.mediaDevices?.getUserMedia ||
+        !window.AudioContext
+      ) {
+        showToast({
+          key: window.isSecureContext ? 'voiceInputUnavailable' : 'voiceInputRequiresHttps',
+        })
+        return
+      }
+      if (!ensureApiKey()) {
+        return
+      }
     }
-    if (status === 'transcribing') {
-      cancel()
-      return
-    }
-    const operation = ++operationRef.current
-    setStatus('recording')
+    const session: Session = { id: createId(), native, controller: new AbortController() }
+    active.current = session
+    setSeconds(0)
+    setStatus('starting')
     try {
+      if (native) {
+        bridge?.startNativeSpeech?.(session.id, useSettings.getState().locale)
+        return
+      }
       const recording = await startRecording(() => {
-        if (operationRef.current === operation) {
+        if (active.current === session) {
           showToast({ key: 'voiceInputLimitReached' })
           void finish()
         }
-      })
-      if (operationRef.current !== operation) {
+      }, session.controller.signal)
+      if (active.current !== session) {
         recording.cancel()
         return
       }
-      recordingRef.current = recording
+      session.recording = recording
+      setStatus('recording')
     } catch (error) {
-      if (operationRef.current === operation) {
-        setStatus('idle')
-        showToast(describeRecordingError(error))
+      if (active.current === session) {
+        cancel()
+        showToast({ key: describeError(error) })
       }
     }
-  }, [status, finish, cancel])
+  }, [cancel, finish])
+
+  useEffect(() => {
+    const onNativeEvent = (event: Event) => {
+      const detail = (event as CustomEvent<NativeEvent>).detail
+      if (!detail || !active.current?.native || active.current.id !== detail.id) {
+        return
+      }
+      if (detail.state === 'recording' || detail.state === 'transcribing') {
+        setStatus(detail.state)
+        return
+      }
+      active.current = null
+      setStatus('idle')
+      if (detail.state === 'result') {
+        accept(detail.text)
+      }
+      if (detail.state === 'error') {
+        if (detail.error === 'unavailable') {
+          nativeUnavailable.current = true
+          showToast({ key: 'voiceInputNativeFallback' })
+        } else {
+          showToast({ key: nativeErrors[detail.error ?? 'failed'] })
+        }
+      }
+    }
+    const onHidden = () => {
+      if (document.hidden) {
+        cancel()
+      }
+    }
+    window.addEventListener('jianliao-speech', onNativeEvent)
+    document.addEventListener('visibilitychange', onHidden)
+    return () => {
+      window.removeEventListener('jianliao-speech', onNativeEvent)
+      document.removeEventListener('visibilitychange', onHidden)
+      cancel()
+    }
+  }, [accept, cancel])
 
   useEffect(() => {
     if (status !== 'recording') {
       return
     }
-    const startedAt = Date.now()
-    setSeconds(0)
-    // 半秒刷新一次，让显示的秒数与实际录音时长保持一致
-    const timer = setInterval(() => {
-      setSeconds(Math.floor((Date.now() - startedAt) / 1000))
-    }, 500)
+    const since = Date.now()
+    const timer = setInterval(() => setSeconds(Math.floor((Date.now() - since) / 1000)), 500)
     return () => clearInterval(timer)
   }, [status])
 
-  useEffect(() => cancelOperation, [cancelOperation])
-
-  /** 当前录音的频谱分析节点，未录音时为 null */
-  const getAnalyser = useCallback(() => recordingRef.current?.analyser ?? null, [])
-
-  return { status, seconds, getAnalyser, toggle, cancel, available: AVAILABLE }
+  return { status, seconds, start, finish, cancel }
 }

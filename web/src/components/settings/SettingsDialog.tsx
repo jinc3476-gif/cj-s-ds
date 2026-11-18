@@ -1,12 +1,10 @@
 import clsx from 'clsx'
-import { useRef, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   IconDarkOutline16,
-  IconDataOutline16,
   IconDownloadOutline16,
   IconFollowsystemOutline16,
   IconLightOutline16,
-  IconSettingsOutline16,
   IconUploadOutline14,
 } from '../base/icons.js'
 import {
@@ -21,11 +19,13 @@ import { regionCodes, getRegionName, provinces } from '../../services/location.j
 import {
   isChineseBrowser,
   setLocale,
+  setChatFontSize,
   setLocation,
   setThemePreference,
   setTtsVoice,
   useSettings,
   type ThemePreference,
+  type ChatFontSize,
 } from '../../services/settings.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
@@ -33,32 +33,29 @@ import { Modal } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
 import { showToast } from '../base/toastState.js'
 import { ApiKeyConfirm, ApiKeyField, useApiKeyEditor } from './ApiKeyField.js'
-import { closeSettings, useSettingsDialog, type SettingsSection } from './settingsDialogState.js'
+import { closeSettings, openSettings, useSettingsDialog } from './settingsDialogState.js'
+import { fontLabels, pageTitles, SettingsHome } from './SettingsHome.js'
 import styles from './Settings.module.css'
 
-/**
- * 设置弹窗：分「通用设置」（主题、语言、朗读音色、位置）与「数据管理」（API Key、导入、导出、删除）。
- * 桌面端为居中弹窗、左侧导航；移动端为底部弹层、导航横排在内容上方
- */
 export const SettingsDialog = () => {
   const open = useSettingsDialog((state) => state.open)
   return open ? <SettingsContent /> : null
 }
 
-const sections: { value: SettingsSection; label: TranslationKey; icon: ReactNode }[] = [
-  {
-    value: 'general',
-    label: 'settingDialogAsideGeneralOptionLabel',
-    icon: <IconSettingsOutline16 />,
-  },
-  { value: 'data', label: 'settingDialogAsideDataOptionLabel', icon: <IconDataOutline16 /> },
-]
-
 const SettingsContent = () => {
   const t = useTranslate()
   const isMobile = useIsMobile()
-  // 打开时按调用方指定的分组选中，之后在弹窗内切换
-  const [section, setSection] = useState(() => useSettingsDialog.getState().section)
+  const section = useSettingsDialog((state) => state.section)
+  const homeRef = useRef<HTMLDivElement>(null)
+  const previousPage = useRef(section)
+  useLayoutEffect(() => {
+    if (section === 'general' && previousPage.current !== 'general') {
+      homeRef.current
+        ?.querySelector<HTMLElement>(`[data-setting="${previousPage.current}"]`)
+        ?.focus()
+    }
+    previousPage.current = section
+  }, [section])
   // 切换分组不丢失正在输入的 API Key 与导入状态
   const apiKeyEditor = useApiKeyEditor()
   const historyImport = useHistoryImport()
@@ -68,79 +65,81 @@ const SettingsContent = () => {
   return (
     <>
       <Modal
-        title={t('settings')}
-        closable
+        title={t(pageTitles[section])}
+        backLabel={t(section === 'general' ? 'close' : 'settingsBack')}
         className={styles.dialog}
         mainClassName={styles.dialogMain}
         onClose={() => {
           if (!historyDelete.busy) {
-            closeSettings()
+            if (section === 'general') {
+              closeSettings()
+            } else {
+              openSettings('general')
+            }
           }
         }}
       >
-        <div role="tablist" className={styles.navigation}>
-          {sections.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              role="tab"
-              aria-selected={section === item.value}
-              className={clsx(styles.navItem, section === item.value && styles.navItemActive)}
-              onClick={() => setSection(item.value)}
-            >
-              {item.icon}
-              {t(item.label)}
-            </button>
-          ))}
+        <div ref={homeRef} className={styles.content} hidden={section !== 'general'}>
+          <SettingsHome />
         </div>
-        <div role="tabpanel" className={styles.content}>
-          {section === 'general' ? (
-            <>
-              <ApiKeyField editor={apiKeyEditor} />
-              <div className={styles.description}>{t('apiProviderNote')}</div>
-              {isMobile ? <ApiKeyConfirm editor={apiKeyEditor} /> : null}
-              <ThemeSetting />
-              <AppUpdateSetting />
-              <details style={{ marginTop: 16 }}>
-                <summary>{t('more')}</summary>
-                <LocaleSetting />
-                <TtsVoiceSetting />
-                <LocationSetting />
-              </details>
-            </>
-          ) : (
-            <>
-              <ImportHistory historyImport={historyImport} disabled={historyBusy} />
-              <ExportHistory disabled={historyBusy} />
-              <SettingCell
-                label={t('deleteAllSessions')}
-                status={null}
-                action={
-                  <Button
-                    variant="dangerOutlined"
-                    size="m"
-                    className={styles.cellButton}
-                    disabled={historyBusy}
-                    onClick={historyDelete.open}
-                  >
-                    {t('delete')}
-                  </Button>
-                }
-              />
-              <details style={{ marginTop: 20, fontSize: 12 }}>
-                <summary>{t('openSourceNotice')}</summary>
-                <p>{t('openSourceDescription', { version: __APP_VERSION__ })}</p>
-                <a href="/LICENSE" target="_blank" rel="noreferrer">
-                  MIT License
-                </a>
-                {' · '}
-                <a href="/THIRD_PARTY_NOTICES.txt" target="_blank" rel="noreferrer">
-                  Third-party notices
-                </a>
-              </details>
-            </>
-          )}
-        </div>
+        {section === 'general' ? null : (
+          <div className={styles.content} key={section}>
+            {section === 'personalization' ? null : (
+              <div className={styles.detail}>
+                {section === 'account' && (
+                  <>
+                    <ApiKeyField editor={apiKeyEditor} />
+                    <div className={styles.description}>{t('apiProviderNote')}</div>
+                    {isMobile ? <ApiKeyConfirm editor={apiKeyEditor} /> : null}
+                  </>
+                )}
+                {section === 'appearance' && <ThemeSetting />}
+                {section === 'version' && <AppUpdateSetting />}
+                {section === 'language' && <LocaleSetting />}
+                {section === 'font' && <ChatFontSetting />}
+                {section === 'voice' && <TtsVoiceSetting />}
+                {section === 'location' && <LocationSetting />}
+                {section === 'data' && (
+                  <>
+                    <ImportHistory historyImport={historyImport} disabled={historyBusy} />
+                    <ExportHistory disabled={historyBusy} />
+                    <SettingCell
+                      label={t('deleteAllSessions')}
+                      status={null}
+                      action={
+                        <Button
+                          variant="dangerOutlined"
+                          size="m"
+                          className={styles.cellButton}
+                          disabled={historyBusy}
+                          onClick={historyDelete.open}
+                        >
+                          {t('delete')}
+                        </Button>
+                      }
+                    />
+                  </>
+                )}
+                {section === 'privacy' && (
+                  <div className={styles.privacy}>
+                    <p>{t('apiProviderNote')}</p>
+                    <p>{t('settingsPrivacyChat')}</p>
+                    <p>{t('settingsPrivacyVoice')}</p>
+                    <h2>{t('openSourceNotice')}</h2>
+                    <p>{t('openSourceDescription', { version: __APP_VERSION__ })}</p>
+                    <a href="/LICENSE" target="_blank" rel="noreferrer">
+                      MIT License
+                    </a>
+                    {' · '}
+                    <a href="/THIRD_PARTY_NOTICES.txt" target="_blank" rel="noreferrer">
+                      Third-party notices
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
       {historyImport.file ? <ImportConfirm historyImport={historyImport} /> : null}
       {historyDelete.opened ? <DeleteAllConfirm historyDelete={historyDelete} /> : null}
@@ -157,11 +156,23 @@ const AppUpdateSetting = () => {
   return (
     <SettingCell
       label={t('appUpdate')}
-      description={t(supported ? (configured ? 'appUpdateReady' : 'appUpdateUnavailable') : 'appUpdateAndroidOnly', { version })}
+      description={t(
+        supported
+          ? configured
+            ? 'appUpdateReady'
+            : 'appUpdateUnavailable'
+          : 'appUpdateAndroidOnly',
+        { version }
+      )}
       status={null}
       action={
-        <Button variant="outlined" size="m" className={styles.cellButton} disabled={!supported}
-          onClick={() => bridge?.checkForUpdate?.()}>
+        <Button
+          variant="outlined"
+          size="m"
+          className={styles.cellButton}
+          disabled={!supported || !configured}
+          onClick={() => bridge?.checkForUpdate?.()}
+        >
           {t('checkForUpdate')}
         </Button>
       }
@@ -322,6 +333,28 @@ const LocaleSetting = () => {
             { value: 'en-US', label: t('settingsLocaleEnUS'), lang: 'en' },
           ]}
           onChange={setLocale}
+        />
+      }
+    />
+  )
+}
+
+const ChatFontSetting = () => {
+  const t = useTranslate()
+  const value = useSettings((state) => state.chatFontSize)
+  return (
+    <SettingCell
+      label={t('settingsChatFont')}
+      status={null}
+      action={
+        <Select
+          ariaLabel={t('settingsChatFont')}
+          value={value}
+          onChange={setChatFontSize}
+          options={(Object.keys(fontLabels) as ChatFontSize[]).map((size) => ({
+            value: size,
+            label: t(fontLabels[size]),
+          }))}
         />
       }
     />

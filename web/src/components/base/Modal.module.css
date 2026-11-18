@@ -56,6 +56,34 @@
   }
 }
 
+.pageHeader {
+  position: relative;
+  min-height: 54px;
+  flex-shrink: 0;
+  justify-content: center;
+  margin: 0;
+  padding: env(safe-area-inset-top, 0px) 54px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  background-color: var(--settings-surface, var(--dsw-alias-bg-layer-2));
+}
+
+.pageHeader .title {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.back {
+  position: absolute;
+  inset-inline-start: max(6px, env(safe-area-inset-left));
+}
+
+.back svg {
+  transform: rotate(180deg);
+  width: 20px;
+  height: 20px;
+}
+
 .main {
   color: var(--dsw-alias-label-secondary);
 }

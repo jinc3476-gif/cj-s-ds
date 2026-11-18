@@ -1,10 +1,10 @@
-import { IconMenuOutline20, IconNewChatOutline20, IconSettingsOutline16 } from '../base/icons.js'
+import { IconMenuOutline20, IconNewChatOutline20 } from '../base/icons.js'
 import { useTranslate } from '../../i18n/index.js'
 import { newChat } from '../../services/chat/store.js'
 import { IconButton } from '../base/IconButton.js'
 import { openMobileSider } from '../sider/mobileSiderState.js'
 import styles from './MobileHeader.module.css'
-import { openSettings } from '../settings/settingsDialogState.js'
+import { ReleaseHistoryButton } from '../updates/ReleaseHistory.js'
 
 /** 移动端顶栏：左侧菜单打开侧边栏；会话页再显示标题与开启新对话 */
 export const MobileHeader = ({ title }: { title?: string }) => {
@@ -19,25 +19,16 @@ export const MobileHeader = ({ title }: { title?: string }) => {
         onClick={openMobileSider}
       />
       <div className={styles.title}>{title ?? t('appName')}</div>
-      {title === undefined ? (
+      {title !== undefined ? (
         <IconButton
           size="xl"
           tone="primary"
-          icon={<IconSettingsOutline16 />}
-          aria-label={t('settings')}
-          onClick={() => openSettings('general')}
+          icon={<IconNewChatOutline20 />}
+          aria-label={t('newChat')}
+          onClick={newChat}
         />
-      ) : (
-        <>
-          <IconButton
-            size="xl"
-            tone="primary"
-            icon={<IconNewChatOutline20 />}
-            aria-label={t('newChat')}
-            onClick={newChat}
-          />
-        </>
-      )}
+      ) : null}
+      <ReleaseHistoryButton />
     </div>
   )
 }

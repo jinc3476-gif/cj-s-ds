@@ -57,7 +57,11 @@ if (values['verify-only']) {
   if (!repoMatch) throw new Error('The configured update URL must be a GitHub latest.json release asset URL')
   const repo = repoMatch[1] + '/' + repoMatch[2].replace(/\.git$/, '')
   if (values.repo && values.repo.toLowerCase() !== repo.toLowerCase()) throw new Error('The selected GitHub repository does not match the URL embedded in the APK')
-  const notes = readFileSync(resolve(values['notes-file'] ?? join(root, 'release-notes.txt')), 'utf8').trim()
+  const history = JSON.parse(readFileSync(join(root, 'release-history.json'), 'utf8'))
+  if (history[0]?.version !== name[3]) throw new Error('The release history must begin with the APK version')
+  const notes = values['notes-file']
+    ? readFileSync(resolve(values['notes-file']), 'utf8').trim()
+    : history[0]['zh-CN'].join('\n')
   if (notes.length > 8000) throw new Error('Release notes exceed 8000 characters')
   const filename = 'jianliao-' + name[3] + '-' + name[2] + '.apk'
   if (!/^[a-zA-Z0-9._-]+$/.test(filename)) throw new Error('Version name is not safe for an APK filename')

@@ -92,7 +92,16 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
         </div>
       </div>
       <div className={styles.bottom}>
-        <button type="button" className={styles.settings} onClick={() => openSettings('general')}>
+        <button
+          type="button"
+          className={styles.settings}
+          onClick={() => {
+            if (mobile) {
+              closeMobileSider()
+            }
+            openSettings('general')
+          }}
+        >
           <span className={styles.settingsIcon}>
             <IconSettingsOutline16 />
           </span>

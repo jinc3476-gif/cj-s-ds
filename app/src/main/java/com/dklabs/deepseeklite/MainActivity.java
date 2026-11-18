@@ -32,12 +32,17 @@ public class MainActivity extends Activity {
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private File pendingExport;
     private AppUpdater updater;
+    private NativeSpeechInput speech;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         preferences = getSharedPreferences("private-settings", MODE_PRIVATE);
         updater = new AppUpdater(this, state);
         web = new WebView(this);
+        speech = new NativeSpeechInput(this, event -> {
+            if (isAppPage()) web.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('jianliao-speech',{detail:" + event + "}))", null);
+        });
         web.setBackgroundColor(0xFFF7F6F2);
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -63,6 +68,7 @@ public class MainActivity extends Activity {
                     Map<String, String> headers = new HashMap<>();
                     headers.put("X-Content-Type-Options", "nosniff");
                     headers.put("Cache-Control", "no-cache");
+                    headers.put("Content-Security-Policy", "frame-src 'none'; object-src 'none'");
                     return new WebResourceResponse(mimeFor(path), "UTF-8", 200, "OK", headers, getAssets().open(path.substring(1)));
                 } catch (IOException error) { return empty(404); }
             }
@@ -152,6 +158,13 @@ public class MainActivity extends Activity {
     }
     private void toast(String message) { runOnUiThread(() -> Toast.makeText(this, message, Toast.LENGTH_LONG).show()); }
 
+    private boolean isAppPage() {
+        if (isDestroyed() || web == null || web.getUrl() == null) return false;
+        Uri uri = Uri.parse(web.getUrl());
+        return "https".equals(uri.getScheme()) && HOST.equals(uri.getHost())
+                && "/index.html".equals(uri.getPath());
+    }
+
     private javax.crypto.SecretKey deviceKey() throws Exception {
         KeyStore store = KeyStore.getInstance("AndroidKeyStore"); store.load(null);
         if (!store.containsAlias(KEY_ALIAS)) {
@@ -164,6 +177,12 @@ public class MainActivity extends Activity {
     }
 
     public class DeviceBridge {
+        @JavascriptInterface public boolean hasNativeSpeech() { return speech.available(); }
+        @JavascriptInterface public void startNativeSpeech(String id, String language) {
+            runOnUiThread(() -> { if (isAppPage() && !isFinishing()) speech.start(id, language); });
+        }
+        @JavascriptInterface public void stopNativeSpeech(String id) { runOnUiThread(() -> speech.stop(id)); }
+        @JavascriptInterface public void cancelNativeSpeech(String id) { runOnUiThread(() -> speech.cancel(id)); }
         @JavascriptInterface public void checkForUpdate() { runOnUiThread(() -> updater.check(true)); }
         @JavascriptInterface public String getAppVersion() { return BuildConfig.VERSION_NAME; }
         @JavascriptInterface public boolean isUpdateConfigured() { return !BuildConfig.UPDATE_MANIFEST_URL.isEmpty(); }
@@ -206,6 +225,9 @@ public class MainActivity extends Activity {
 
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] grants) {
         super.onRequestPermissionsResult(code, permissions, grants);
+        if (code == NativeSpeechInput.PERMISSION) {
+            speech.onPermissionResult(grants.length > 0 && grants[0] == PackageManager.PERMISSION_GRANTED);
+        }
         if (code == AUDIO_PERMISSION && microphoneRequest != null) {
             if (grants.length > 0 && grants[0] == PackageManager.PERMISSION_GRANTED) microphoneRequest.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
             else microphoneRequest.deny();
@@ -241,9 +263,11 @@ public class MainActivity extends Activity {
     }
     @Override protected void onSaveInstanceState(Bundle state) { updater.saveState(state); super.onSaveInstanceState(state); }
     @Override protected void onPause() { updater.onPause(); super.onPause(); web.onPause(); }
-    @Override protected void onResume() { super.onResume(); if (web != null) web.onResume(); if (updater != null) updater.onResume(); }
+    @Override protected void onResume() { super.onResume(); if (web != null) web.onResume(); if (updater != null) updater.onResume(); if (speech != null) speech.refreshAvailability(); }
+    @Override protected void onStop() { speech.cancelActive(); super.onStop(); }
     @Override protected void onDestroy() {
         updater.destroy();
+        speech.cancelActive();
         if (fileCallback != null) fileCallback.onReceiveValue(null);
         if (microphoneRequest != null) microphoneRequest.deny();
         web.removeJavascriptInterface("AndroidBridge"); web.destroy(); io.shutdown(); super.onDestroy();

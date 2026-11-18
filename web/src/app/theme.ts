@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { useSettings, type ThemePreference } from '../services/settings.js'
+import { chatFontPixels, useSettings, type ThemePreference } from '../services/settings.js'
 
 export type Theme = 'light' | 'dark'
 
@@ -62,6 +62,16 @@ const syncTheme = () => {
 
 /** 首屏渲染前同步应用一次，之后随主题设置与系统深浅色变化更新 */
 export const setupTheme = () => {
+  const syncFontSize = () => {
+    const pixels = chatFontPixels[useSettings.getState().chatFontSize]
+    document.body.style.setProperty('--chat-font-size', `${pixels}px`)
+  }
+  syncFontSize()
+  useSettings.subscribe((state, last) => {
+    if (state.chatFontSize !== last.chatFontSize) {
+      syncFontSize()
+    }
+  })
   syncTheme()
   if (document.readyState !== 'complete') {
     window.addEventListener('load', syncPageBackground, { once: true })

@@ -17,6 +17,10 @@ interface Window {
     checkForUpdate?(): void
     getAppVersion?(): string
     isUpdateConfigured?(): boolean
+    hasNativeSpeech?(): boolean
+    startNativeSpeech?(id: string, language: string): void
+    stopNativeSpeech?(id: string): void
+    cancelNativeSpeech?(id: string): void
   }
   handleAndroidBack?: () => boolean
 }

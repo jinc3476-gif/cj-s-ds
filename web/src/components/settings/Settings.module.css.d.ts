@@ -1,9 +1,14 @@
 declare const styles: {
   readonly "dialog": string;
   readonly "dialogMain": string;
-  readonly "navigation": string;
-  readonly "navItem": string;
-  readonly "navItemActive": string;
+  readonly "group": string;
+  readonly "list": string;
+  readonly "listRow": string;
+  readonly "detail": string;
+  readonly "privacy": string;
+  readonly "rowValue": string;
+  readonly "rowIcon": string;
+  readonly "chevron": string;
   readonly "content": string;
   readonly "cell": string;
   readonly "row": string;

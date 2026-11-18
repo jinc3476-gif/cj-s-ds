@@ -1,8 +1,7 @@
 /**
  * 录音并编码为 ASR 接受的 WAV（单声道、16-bit PCM、16kHz）。
  *
- * AudioContext 以 16kHz 创建，浏览器负责重采样；ScriptProcessorNode 采集 PCM 样本。
- * 录音处理在页面内完成。
+ * 以设备采样率采集，写入 WAV 时再转成 16kHz。
  */
 export const SAMPLE_RATE = 16000
 /** ASR 单次时长上限 120 秒 */
@@ -15,19 +14,19 @@ export type Recording = {
   stop: () => Promise<Blob | null>
   /** 放弃录音，释放麦克风 */
   cancel: () => void
-  /** 频谱分析节点，只读；采样率与录音一致 */
-  analyser: AnalyserNode
 }
 
 /** 开始录音；到达时长上限时调用 onLimit，由调用方决定何时 stop */
-export const startRecording = async (onLimit: () => void): Promise<Recording> => {
+export const startRecording = async (onLimit: () => void, signal: AbortSignal): Promise<Recording> => {
+  if (signal.aborted) {
+    throw new DOMException('Cancelled', 'AbortError')
+  }
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
   })
   let context: AudioContext | undefined
   let source: MediaStreamAudioSourceNode | undefined
   let processor: ScriptProcessorNode | undefined
-  let analyser: AnalyserNode | undefined
   let released = false
 
   const release = () => {
@@ -35,11 +34,12 @@ export const startRecording = async (onLimit: () => void): Promise<Recording> =>
       return
     }
     released = true
+    signal.removeEventListener('abort', release)
     if (processor) {
       processor.onaudioprocess = null
     }
     // 初始化可能只完成了一部分；单个节点断开失败也不能阻止麦克风释放。
-    for (const node of [processor, analyser, source]) {
+    for (const node of [processor, source]) {
       try {
         node?.disconnect()
       } catch {
@@ -53,13 +53,14 @@ export const startRecording = async (onLimit: () => void): Promise<Recording> =>
   }
 
   try {
-    context = new AudioContext({ sampleRate: SAMPLE_RATE })
+    if (signal.aborted) {
+      throw new DOMException('Cancelled', 'AbortError')
+    }
+    signal.addEventListener('abort', release, { once: true })
+    context = new AudioContext()
+    const rate = context.sampleRate
     source = context.createMediaStreamSource(stream)
     processor = context.createScriptProcessor(BUFFER_SIZE, 1, 1)
-    // 频谱分析用：串在录音链路中间（原样透传），WebKit 不会处理未连到输出的分析节点
-    analyser = context.createAnalyser()
-    analyser.fftSize = 512
-    analyser.smoothingTimeConstant = 0.2
     const chunks: Float32Array[] = []
     let length = 0
     let limited = false
@@ -69,27 +70,25 @@ export const startRecording = async (onLimit: () => void): Promise<Recording> =>
       }
       chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)))
       length += BUFFER_SIZE
-      if (length >= MAX_SECONDS * SAMPLE_RATE) {
+      if (length >= MAX_SECONDS * rate) {
         limited = true
         onLimit()
       }
     }
-    source.connect(analyser)
-    analyser.connect(processor)
+    source.connect(processor)
     // ScriptProcessorNode 只有连到输出才会持续回调；输出缓冲保持静音
     processor.connect(context.destination)
     // 在 await getUserMedia 之后创建，iOS 上可能处于 suspended
     if (context.state === 'suspended') {
-      void context.resume().catch(() => {})
+      await context.resume()
     }
 
     return {
       stop: async () => {
         release()
-        return length === 0 ? null : encodeWav(chunks, length)
+        return length === 0 ? null : encodeWav(chunks, length, rate)
       },
       cancel: release,
-      analyser,
     }
   } catch (error) {
     release()
@@ -97,8 +96,9 @@ export const startRecording = async (onLimit: () => void): Promise<Recording> =>
   }
 }
 
-const encodeWav = (chunks: Float32Array[], length: number) => {
-  const samples = Math.min(length, MAX_SECONDS * SAMPLE_RATE)
+const encodeWav = (chunks: Float32Array[], length: number, rate: number) => {
+  const ratio = rate / SAMPLE_RATE
+  const samples = Math.min(Math.floor(length / ratio), MAX_SECONDS * SAMPLE_RATE)
   const buffer = new ArrayBuffer(44 + samples * 2)
   const view = new DataView(buffer)
   const writeString = (offset: number, text: string) => {
@@ -119,14 +119,16 @@ const encodeWav = (chunks: Float32Array[], length: number) => {
   view.setUint16(34, 16, true)
   writeString(36, 'data')
   view.setUint32(40, samples * 2, true)
-  let offset = 44
-  let written = 0
-  for (const chunk of chunks) {
-    for (let i = 0; i < chunk.length && written < samples; i++, written++) {
-      const sample = Math.max(-1, Math.min(1, chunk[i]))
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
-      offset += 2
+  // Average each source window across chunk boundaries (typically 48 or 44.1 kHz).
+  for (let i = 0; i < samples; i++) {
+    const start = Math.floor(i * ratio)
+    const end = Math.max(start + 1, Math.floor((i + 1) * ratio))
+    let sum = 0
+    for (let j = start; j < end; j++) {
+      sum += chunks[Math.floor(j / BUFFER_SIZE)][j % BUFFER_SIZE]
     }
+    const sample = Math.max(-1, Math.min(1, sum / (end - start)))
+    view.setInt16(44 + i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
   }
   return new Blob([buffer], { type: 'audio/wav' })
 }

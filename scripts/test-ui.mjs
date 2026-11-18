@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -13,6 +13,8 @@ const output = resolve(import.meta.dirname, '../artifacts/qa')
 mkdirSync(output, { recursive: true })
 const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH, headless: true })
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'zh-CN', isMobile: true, hasTouch: true })
+const history = JSON.parse(readFileSync(new URL('../release-history.json', import.meta.url), 'utf8'))
+const version = history[0].version
 const page = await context.newPage()
 const errors = []
 const requests = []
@@ -20,16 +22,16 @@ const results = []
 let holdNext = false
 let rejectNext = false
 page.on('pageerror', e => errors.push(e.message))
-await page.addInitScript(() => {
+await page.addInitScript(version => {
   window.AndroidBridge = {
     getApiKey: () => localStorage.getItem('synthetic-native-key') ?? '',
     setApiKey: key => { localStorage.setItem('synthetic-native-key', key); return true },
     saveDownload: (name, base64) => { window.testDownload = { name, length: base64.length } },
-    getAppVersion: () => '0.1.1',
+    getAppVersion: () => version,
     isUpdateConfigured: () => window.testUpdateConfigured ?? false,
     checkForUpdate: () => { window.testUpdateChecks = (window.testUpdateChecks ?? 0) + 1 },
   }
-})
+}, version)
 const events = text => [
   { type: 'message_start', message: { id: 'mock-message', role: 'assistant', content: [] } },
   { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
@@ -71,6 +73,8 @@ await context.route('https://api.deepseek.com/**', async route => {
   throw new Error('Unexpected API request: ' + url.pathname)
 })
 async function visible(locator) { await locator.waitFor({ state: 'visible', timeout: 10000 }) }
+const button = name => page.getByRole('button', { name, exact: true })
+const setting = name => page.locator(`button[data-setting="${name}"]`)
 async function check(name, fn) { await fn(); results.push(name); console.log('PASS ' + name) }
 async function noOverflow() {
   const layout = await page.evaluate(() => ({ width: innerWidth, body: document.documentElement.scrollWidth }))
@@ -79,24 +83,27 @@ async function noOverflow() {
 try {
   await page.goto('http://127.0.0.1:8091')
   await check('首次启动展示 API Key 设置', async () => {
+    await visible(page.getByRole('dialog', { name: '账号管理', exact: true }))
+    await button('返回').click()
     await visible(page.getByRole('dialog', { name: '设置', exact: true }))
     await page.screenshot({ path: resolve(output, '01-settings.png') })
   })
-  await check('更新服务未配置时显示真实状态，检查按钮调用原生入口', async () => {
-    await visible(page.getByText('当前版本 0.1.1 · 更新服务尚未启用', { exact: true }))
-    await page.getByRole('button', { name: '检查更新', exact: true }).click()
-    assert.equal(await page.evaluate(() => window.testUpdateChecks), 1)
+  await check('更新服务未配置时显示真实状态', async () => {
+    await setting('version').click()
+    await visible(page.getByText(`当前版本 ${version} · 更新服务尚未启用`, { exact: true }))
+    assert(await button('检查更新').isDisabled())
     await noOverflow()
     await page.screenshot({ path: resolve(output, '01a-update-settings.png') })
   })
-  await check('配置发布地址后显示启动检查提示', async () => {
+  await check('配置发布地址后能调用原生更新入口', async () => {
     await page.evaluate(() => { window.testUpdateConfigured = true })
-    await page.getByRole('tab', { name: '数据管理' }).click()
-    await page.getByRole('tab', { name: '通用设置' }).click()
-    await visible(page.getByText('当前版本 0.1.1 · 启动时自动检查更新', { exact: true }))
-    await page.evaluate(() => { window.testUpdateConfigured = false })
-    await page.getByRole('tab', { name: '数据管理' }).click()
-    await page.getByRole('tab', { name: '通用设置' }).click()
+    await button('返回').click()
+    await setting('version').click()
+    await visible(page.getByText(`当前版本 ${version} · 启动时自动检查更新`, { exact: true }))
+    await button('检查更新').click()
+    assert.equal(await page.evaluate(() => window.testUpdateChecks), 1)
+    await button('返回').click()
+    await setting('account').click()
   })
   await check('拒绝无效 Key；有效 Key 校验后保存至原生桥接', async () => {
     const keyInput = page.locator('input[type=password]')
@@ -108,7 +115,27 @@ try {
     await keyInput.waitFor({ state: 'detached' })
     assert.equal(await page.evaluate(() => localStorage.getItem('chat-demo:api-key')), null)
     assert.equal(await page.evaluate(() => window.AndroidBridge.getApiKey()), 'sk-test-synthetic-only')
+    await button('返回').click()
+    await visible(setting('account').getByText('已配置'))
+    await page.screenshot({ path: resolve(output, '01-settings.png') })
     await page.getByRole('button', { name: '关闭', exact: true }).click()
+  })
+  await check('右上角铃铛可离线查看本版和历次更新，Android 返回保留草稿', async () => {
+    await page.locator('textarea').fill('保留我的草稿')
+    await context.setOffline(true)
+    try {
+      await button('更新记录').click()
+      const dialog = page.getByRole('dialog', { name: '更新记录' })
+      await visible(dialog)
+      for (const release of history) {
+        await visible(dialog.getByRole('heading', { name: new RegExp(release.version.replaceAll('.', '\\.')) }))
+        assert(await dialog.getByText(release['zh-CN'][0], { exact: true }).count())
+      }
+      await page.screenshot({ path: resolve(output, '01b-release-history.png') })
+      assert.equal(await page.evaluate(() => window.handleAndroidBack()), true)
+      assert.equal(await page.locator('textarea').inputValue(), '保留我的草稿')
+    } finally { await context.setOffline(false) }
+    await page.locator('textarea').fill('')
   })
   await check('手机首页及快捷提问可用', async () => {
     await visible(page.getByText('想法，从这里开始。', { exact: true }))
@@ -150,7 +177,7 @@ try {
     await visible(page.getByText('sample.txt', { exact: true }))
     await page.locator('textarea').fill('请读这个文件')
     await page.getByRole('button', { name: '发送', exact: true }).click()
-    await page.getByRole('button', { name: '发送', exact: true }).waitFor({ state: 'visible' })
+    await page.getByRole('button', { name: '语音输入', exact: true }).waitFor({ state: 'visible' })
     const file = requests.find(r => r.file)
     assert.equal(file.path, '/anthropic/v1/files')
     assert.equal(file.multipart, true)
@@ -162,14 +189,14 @@ try {
     await page.locator('textarea').fill('测试停止生成')
     await page.getByRole('button', { name: '发送', exact: true }).click()
     await page.getByRole('button', { name: '停止生成', exact: true }).click()
-    await visible(page.getByRole('button', { name: '发送', exact: true }))
+    await visible(page.getByRole('button', { name: '语音输入', exact: true }))
   })
   await check('返回键关闭侧栏，历史可导出到原生保存器', async () => {
     await page.getByRole('button', { name: '打开边栏', exact: true }).click()
     assert.equal(await page.evaluate(() => window.handleAndroidBack()), true)
     await page.getByRole('button', { name: '打开边栏', exact: true }).click()
     await page.getByRole('button', { name: '设置', exact: true }).click()
-    await page.getByRole('tab', { name: '数据管理' }).click()
+    await setting('data').click()
     await page.getByRole('button', { name: '下载', exact: true }).click()
     await page.waitForFunction(() => window.testDownload?.length > 0)
     assert((await page.evaluate(() => window.testDownload.name)).endsWith('.zip'))
@@ -178,11 +205,12 @@ try {
     await page.setViewportSize({ width: 320, height: 740 })
     await noOverflow()
     await page.screenshot({ path: resolve(output, '04-narrow-settings.png') })
-    await page.getByRole('tab', { name: '通用设置' }).click()
+    await button('返回').click()
+    await setting('appearance').click()
     await page.getByRole('radio', { name: '深色', exact: true }).click()
+    await button('返回').click()
     await page.getByRole('button', { name: '关闭', exact: true }).click()
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.evaluate(() => window.handleAndroidBack())
     await page.getByRole('button', { name: '打开边栏', exact: true }).click()
     await page.getByRole('button', { name: '开启新对话', exact: true }).first().click()
     await visible(page.getByText('想法，从这里开始。', { exact: true }))

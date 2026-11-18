@@ -13,7 +13,7 @@ const include = [
   'web/.oxfmtrc.json', 'web/.oxlintrc.json', 'web/README.md', 'web/README.zh-CN.md',
   'scripts', 'gradle', 'gradlew', 'gradlew.bat', 'build.gradle', 'settings.gradle',
   'gradle.properties', '.gitignore', 'README.md', 'UPSTREAM.md', 'artifacts/qa/results.json',
-  'version.properties', 'update.properties', 'signing-certificate.sha256', 'release-notes.txt', 'UPDATES.md',
+  'version.properties', 'update.properties', 'signing-certificate.sha256', 'release-history.json', 'UPDATES.md',
 ]
 function add(path) {
   if (statSync(path).isDirectory()) {
