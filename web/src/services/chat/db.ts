@@ -85,6 +85,39 @@ export const loadSession = async (id: string): Promise<Session | undefined> =>
 export const loadProjects = async () => (await getDB()).getAll('projects')
 export const saveProject = async (project: Project) => (await getDB()).put('projects', project)
 
+/** 删除项目和所有归属会话；同一事务内只清理不再被其他会话引用的附件。 */
+export const deleteProject = async (projectId: string): Promise<void> => {
+  const tx = (await getDB()).transaction(
+    ['projects', 'sessions', 'sessionSummaries', 'files'],
+    'readwrite'
+  )
+  try {
+    const summaries = tx.objectStore('sessionSummaries')
+    for (
+      let cursor = await summaries.openCursor();
+      cursor;
+      cursor = await cursor.continue()
+    ) {
+      if (cursor.value.projectId !== projectId) {
+        continue
+      }
+      const summary = cursor.value
+      await tx.objectStore('sessions').delete(summary.id)
+      await cursor.delete()
+      for (const id of summary.fileIds) {
+        if ((await summaries.index('fileIds').count(id)) === 0) {
+          await tx.objectStore('files').delete(id)
+        }
+      }
+    }
+    await tx.objectStore('projects').delete(projectId)
+    await tx.done
+  } catch (error) {
+    abortTransaction(tx)
+    throw error
+  }
+}
+
 export const saveSession = async (session: Session, files: StoredFile[] = []): Promise<void> => {
   const summary = storedSummary(session)
   const tx = (await getDB()).transaction(['sessions', 'sessionSummaries', 'files'], 'readwrite')

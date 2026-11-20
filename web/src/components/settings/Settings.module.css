@@ -19,7 +19,12 @@
   flex: 1;
   min-height: 0;
   flex-direction: column;
+  overflow: hidden;
   color: var(--dsw-alias-label-primary);
+}
+
+.content:first-child {
+  --page-entry-direction: -1;
 }
 
 .content {

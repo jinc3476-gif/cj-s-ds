@@ -154,15 +154,30 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
 /** 移动端抽屉：浮在页面上方，点空白区域关闭。 */
 export const MobileSider = () => {
   const open = useMobileSider((state) => state.open)
-  if (!open) {
+  const [retainForExit, setRetainForExit] = useState(false)
+  useEffect(() => {
+    if (open) {
+      setRetainForExit(true)
+    }
+  }, [open])
+  if (!open && !retainForExit) {
     return null
   }
   return (
-    <>
+    <div
+      className={styles.drawerLayer}
+      data-closing={!open || undefined}
+      ref={node => { if (node) { node.inert = !open } }}
+      onAnimationEnd={event => {
+        if (!open && event.target === event.currentTarget) {
+          setRetainForExit(false)
+        }
+      }}
+    >
       <div className={styles.drawerMask} onClick={closeMobileSider} />
       <div className={styles.drawer}>
         <Sider mobile />
       </div>
-    </>
+    </div>
   )
 }

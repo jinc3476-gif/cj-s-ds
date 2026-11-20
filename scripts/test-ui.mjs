@@ -7,7 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 // Uses an isolated browser context and synthetic keys. No paid API requests.
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE
   ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright')
-process.env.PORT = '8091'
+process.env.PORT ??= '8091'
 const { server } = await import('./preview.mjs')
 const output = resolve(import.meta.dirname, '../artifacts/qa')
 mkdirSync(output, { recursive: true })
@@ -81,7 +81,7 @@ async function noOverflow() {
   assert(layout.body <= layout.width + 1, JSON.stringify(layout))
 }
 try {
-  await page.goto('http://127.0.0.1:8091')
+  await page.goto(`http://127.0.0.1:${process.env.PORT}`)
   await check('首次启动展示 API Key 设置', async () => {
     await visible(page.getByRole('dialog', { name: '账号管理', exact: true }))
     await button('返回').click()

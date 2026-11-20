@@ -79,11 +79,11 @@ const SettingsContent = () => {
           }
         }}
       >
-        <div ref={homeRef} className={styles.content} hidden={section !== 'general'}>
+        <div ref={homeRef} className={clsx(styles.content, 'quovia-page-enter')} hidden={section !== 'general'}>
           <SettingsHome />
         </div>
         {section === 'general' ? null : (
-          <div className={styles.content} key={section}>
+          <div className={clsx(styles.content, 'quovia-page-enter')} key={section}>
             {section === 'personalization' ? null : (
               <div className={styles.detail}>
                 {section === 'account' && (

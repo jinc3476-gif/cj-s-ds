@@ -529,6 +529,75 @@ export const removeSession = (id: string): Promise<boolean> => {
   return task
 }
 
+/** 删除项目及其全部会话；先停止生成并等待落盘，再由数据库事务整体删除。 */
+export const removeProject = async (projectId: string): Promise<boolean> => {
+  const state = get()
+  if (state.importingHistory || !state.projects.some((project) => project.id === projectId)) {
+    return false
+  }
+  const epoch = historyEpoch
+  const ids = state.sessions
+    .filter((session) => session.projectId === projectId)
+    .map((session) => session.id)
+  ids.forEach((id) => {
+    deletingSessions.add(id)
+    getStreamController(id)?.abort()
+  })
+  try {
+    for (const id of ids) {
+      await waitForIdle(id)
+    }
+    if (epoch !== historyEpoch) {
+      return false
+    }
+    await db.deleteProject(projectId)
+    if (epoch !== historyEpoch) {
+      return true
+    }
+    ids.forEach((id) => {
+      sessionLoads.delete(id)
+      sessionAccess.delete(id)
+      unsavedSessions.delete(id)
+      pendingFiles.delete(id)
+      clearDraft(id)
+    })
+    const draftId = projectDraftKey(projectId)
+    if (draftId) {
+      clearDraft(draftId)
+    }
+    set((current) => ({
+      projects: current.projects.filter((project) => project.id !== projectId),
+      sessions: current.sessions.filter((session) => session.projectId !== projectId),
+      sessionCache: Object.fromEntries(
+        Object.entries(current.sessionCache).filter(([id]) => !ids.includes(id))
+      ),
+      sessionLoadErrors: Object.fromEntries(
+        Object.entries(current.sessionLoadErrors).filter(([id]) => !ids.includes(id))
+      ),
+      sessionSaveErrors: Object.fromEntries(
+        Object.entries(current.sessionSaveErrors).filter(([id]) => !ids.includes(id))
+      ),
+      activeId: ids.includes(current.activeId ?? '') ? null : current.activeId,
+      activeProjectId: current.activeProjectId === projectId ? null : current.activeProjectId,
+    }))
+    return true
+  } catch (error) {
+    db.reportStorageError('delete project')(error)
+    return false
+  } finally {
+    ids.forEach((id) => deletingSessions.delete(id))
+    ids.forEach((id) => {
+      if (getSession(id)) {
+        if (get().importingHistory) {
+          unsavedSessions.add(id)
+        } else {
+          persist(id)
+        }
+      }
+    })
+  }
+}
+
 const removeSessionData = async (id: string): Promise<boolean> => {
   if (get().importingHistory || deletingSessions.has(id)) {
     return false

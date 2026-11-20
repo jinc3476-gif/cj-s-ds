@@ -1,5 +1,18 @@
 [
   {
+    "version": "0.1.7",
+    "zh-CN": [
+      "项目名称右侧新增编辑和删除按钮。删除前会显示项目名称和对话数量；确认后会删除项目及其中的对话，其他对话仍在使用的附件会保留。",
+      "聊天和设置页面从侧面 150 像素处滑入，手机侧栏展开与收起时均有过渡动画。",
+      "启动时先显示 Quovia 图标，再从屏幕四周向中心显露初始界面。支持系统的「减少动态效果」设置。"
+    ],
+    "en-US": [
+      "Edit or delete a project beside its name. Before deletion, a confirmation shows the project name and chat count. Deleting a project removes its chats but keeps attachments used by other chats.",
+      "Chat and settings pages slide in from 150 pixels away, and the mobile sidebar animates both when opening and closing.",
+      "On launch, the Quovia icon appears before the interface is revealed from the edges inward. Reduced-motion preferences are respected."
+    ]
+  },
+  {
     "version": "0.1.6",
     "zh-CN": [
       "新增项目，可创建和重命名项目，并为项目保存独立记忆；普通对话与项目对话互相隔离，项目会话也支持历史备份与恢复。",
