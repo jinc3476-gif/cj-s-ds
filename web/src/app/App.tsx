@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslate } from '../i18n/index.js'
 import { useSettings } from '../services/settings.js'
+import { useTheme } from './theme.js'
 import { useIsMobile, useMobileViewport, usePreventPageScroll } from './viewport.js'
 import {
   bindChatPersistence,
@@ -29,6 +30,7 @@ import styles from './App.module.css'
 
 export const App = () => {
   const [showSplash, setShowSplash] = useState(true)
+  const theme = useTheme()
   const t = useTranslate()
   const isMobile = useIsMobile()
   const locale = useSettings((state) => state.locale)
@@ -147,7 +149,7 @@ export const App = () => {
       <SettingsDialog />
       <Toast />
       {showSplash && (
-        <div className={styles.splash} aria-hidden="true">
+        <div className={styles.splash} data-theme={theme} aria-hidden="true">
           <svg viewBox="0 0 108 108" focusable="false">
             <path
               fill="url(#quovia-splash-a)"

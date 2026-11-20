@@ -1,7 +1,11 @@
 import type { ReactNode } from 'react'
 import { useTranslate, type TranslationKey } from '../../i18n/index.js'
 import { getRegionName, provinces } from '../../services/location.js'
-import { useSettings, type ChatFontSize } from '../../services/settings.js'
+import {
+  hasPersonalizationContent,
+  useSettings,
+  type ChatFontSize,
+} from '../../services/settings.js'
 import {
   IconChevronRightOutline14,
   IconDataOutline16,
@@ -20,6 +24,7 @@ export const pageTitles = {
   appearance: 'settingsAppearance',
   font: 'settingsFont',
   personalization: 'settingsPersonalization',
+  theme: 'settingsThemeEntry',
   location: 'settingsLocation',
   voice: 'settingsTtsVoice',
   privacy: 'settingsPrivacy',
@@ -86,11 +91,13 @@ const groups: { title: TranslationKey; pages: Detail[] }[] = [
 
 export const SettingsHome = () => {
   const t = useTranslate()
-  const { apiKey, locale, themePreference, chatFontSize, ttsVoice, location } = useSettings()
+  const { apiKey, locale, themePreference, chatFontSize, ttsVoice, location, personalization } =
+    useSettings()
   const province = location?.province
     ? provinces.find((item) => item.code === location.province)
     : null
   const city = province?.cities.find((item) => item.code === location?.city)
+  const hasCustom = hasPersonalizationContent(personalization)
   const status: Partial<Record<Detail, string>> = {
     account: t(apiKey ? 'settingsConfigured' : 'settingsNotConfigured'),
     language: t(locale === 'zh-CN' ? 'settingsLocaleZhCN' : 'settingsLocaleEnUS'),
@@ -102,6 +109,13 @@ export const SettingsHome = () => {
       }[themePreference] as TranslationKey
     ),
     font: t(fontLabels[chatFontSize]),
+    personalization: t(
+      hasCustom
+        ? personalization.enabled
+          ? 'settingsConfigured'
+          : 'settingsDisabled'
+        : 'settingsUnset'
+    ),
     location:
       city?.name ||
       province?.name ||

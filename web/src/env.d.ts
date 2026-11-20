@@ -20,6 +20,7 @@ interface Window {
     startNativeRecording?(id: string): void
     stopNativeRecording?(id: string): void
     cancelNativeRecording?(id: string): void
+    syncTheme?(preference: string, dark: boolean): void
   }
   handleAndroidBack?: () => boolean
 }

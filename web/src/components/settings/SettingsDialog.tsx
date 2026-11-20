@@ -1,12 +1,16 @@
 import clsx from 'clsx'
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
+  IconChevronRightOutline14,
   IconDarkOutline16,
   IconDownloadOutline16,
   IconFollowsystemOutline16,
   IconLightOutline16,
   IconUploadOutline14,
 } from '../base/icons.js'
+import { ApiError, fetchUserBalance } from '../../services/api/client.js'
+import { classifyApiError } from '../../services/api/errors.js'
+import type { UserBalanceResponse } from '../../services/api/types.js'
 import {
   BackupError,
   clearHistory,
@@ -17,15 +21,20 @@ import { useIsMobile } from '../../app/viewport.js'
 import { useChatStore } from '../../services/chat/store.js'
 import { regionCodes, getRegionName, provinces } from '../../services/location.js'
 import {
+  hasPersonalizationContent,
   isChineseBrowser,
+  resetPersonalization,
   setLocale,
   setChatFontSize,
   setLocation,
+  setPersonalization,
   setThemePreference,
   setTtsVoice,
   useSettings,
   type ThemePreference,
   type ChatFontSize,
+  type ReplyLanguagePreference,
+  type ReplyStylePreset,
 } from '../../services/settings.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
@@ -73,6 +82,8 @@ const SettingsContent = () => {
           if (!historyDelete.busy) {
             if (section === 'general') {
               closeSettings()
+            } else if (section === 'theme') {
+              openSettings('personalization')
             } else {
               openSettings('general')
             }
@@ -84,12 +95,15 @@ const SettingsContent = () => {
         </div>
         {section === 'general' ? null : (
           <div className={clsx(styles.content, 'quovia-page-enter')} key={section}>
-            {section === 'personalization' ? null : (
+            {section === 'theme' ? null : section === 'personalization' ? (
+              <PersonalizationSetting />
+            ) : (
               <div className={styles.detail}>
                 {section === 'account' && (
                   <>
                     <ApiKeyField editor={apiKeyEditor} />
                     {isMobile ? <ApiKeyConfirm editor={apiKeyEditor} /> : null}
+                    <AccountBalance />
                     <section className={styles.platform}>
                       <h2>{t('platformTitle')}</h2>
                       <div className={styles.platformRow}>
@@ -153,6 +167,261 @@ const SettingsContent = () => {
       {historyImport.file ? <ImportConfirm historyImport={historyImport} /> : null}
       {historyDelete.opened ? <DeleteAllConfirm historyDelete={historyDelete} /> : null}
     </>
+  )
+}
+
+const styleOptions: { value: ReplyStylePreset; label: TranslationKey }[] = [
+  { value: 'default', label: 'personalizationStyleDefault' },
+  { value: 'concise', label: 'personalizationStyleConcise' },
+  { value: 'detailed', label: 'personalizationStyleDetailed' },
+  { value: 'professional', label: 'personalizationStyleProfessional' },
+  { value: 'casual', label: 'personalizationStyleCasual' },
+]
+
+const replyLanguageOptions: { value: ReplyLanguagePreference; label: TranslationKey }[] = [
+  { value: 'auto', label: 'personalizationLanguageAuto' },
+  { value: 'zh-CN', label: 'personalizationLanguageZhCN' },
+  { value: 'zh-TW', label: 'personalizationLanguageZhTW' },
+  { value: 'en', label: 'personalizationLanguageEn' },
+  { value: 'ja', label: 'personalizationLanguageJa' },
+]
+
+/** 个性化设置：全局自定义指令（称呼/背景/回复风格/语言偏好/附加要求）+ 底部「主题」占位入口 */
+const PersonalizationSetting = () => {
+  const t = useTranslate()
+  const personalization = useSettings((state) => state.personalization)
+  const hasContent = hasPersonalizationContent(personalization)
+  return (
+    <div className={styles.personalizationWrap}>
+      <div className={styles.detail}>
+        <div className={clsx(styles.cell, styles.row)}>
+          <div className={styles.text}>
+            <div className={styles.label}>{t('personalizationEnable')}</div>
+            <div className={styles.description}>{t('personalizationEnableDesc')}</div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={personalization.enabled}
+            aria-label={t('personalizationEnable')}
+            className={clsx(styles.switch, personalization.enabled && styles.switchChecked)}
+            onClick={() => setPersonalization({ enabled: !personalization.enabled })}
+          >
+            <span className={styles.switchThumb} />
+          </button>
+        </div>
+
+        <div className={clsx(styles.personalizationForm, !personalization.enabled && styles.personalizationMuted)}>
+          <label className={styles.field}>
+            <span className={styles.label}>{t('personalizationNickname')}</span>
+            <input
+              type="text"
+              maxLength={60}
+              className={styles.textInput}
+              value={personalization.nickname}
+              placeholder={t('personalizationNicknamePlaceholder')}
+              onChange={(event) => setPersonalization({ nickname: event.target.value })}
+            />
+          </label>
+
+          <label className={styles.field}>
+            <span className={styles.label}>{t('personalizationBackground')}</span>
+            <textarea
+              rows={3}
+              maxLength={1500}
+              className={styles.textareaInput}
+              value={personalization.background}
+              placeholder={t('personalizationBackgroundPlaceholder')}
+              onChange={(event) => setPersonalization({ background: event.target.value })}
+            />
+          </label>
+
+          <div className={styles.field}>
+            <span className={styles.label}>{t('personalizationStyle')}</span>
+            <div
+              role="radiogroup"
+              aria-label={t('personalizationStyle')}
+              className={styles.chipGroup}
+            >
+              {styleOptions.map((option) => {
+                const selected = personalization.stylePreset === option.value
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    className={clsx(styles.chip, selected && styles.chipSelected)}
+                    onClick={() => setPersonalization({ stylePreset: option.value })}
+                  >
+                    {t(option.label)}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <SettingCell
+            label={t('personalizationLanguage')}
+            status={null}
+            className={styles.inlineSelectCell}
+            action={
+              <Select
+                ariaLabel={t('personalizationLanguage')}
+                value={personalization.languagePreference}
+                options={replyLanguageOptions.map((option) => ({
+                  value: option.value,
+                  label: t(option.label),
+                }))}
+                onChange={(languagePreference) => setPersonalization({ languagePreference })}
+              />
+            }
+          />
+
+          <label className={styles.field}>
+            <span className={styles.label}>{t('personalizationCustom')}</span>
+            <textarea
+              rows={4}
+              maxLength={1500}
+              className={styles.textareaInput}
+              value={personalization.customInstructions}
+              placeholder={t('personalizationCustomPlaceholder')}
+              onChange={(event) => setPersonalization({ customInstructions: event.target.value })}
+            />
+          </label>
+
+          {hasContent ? (
+            <div className={styles.personalizationFooter}>
+              <Button variant="outlined" size="s" onClick={resetPersonalization}>
+                {t('personalizationReset')}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className={styles.list}>
+        <button
+          type="button"
+          className={styles.listRow}
+          data-setting="theme"
+          onClick={() => openSettings('theme')}
+        >
+          <span aria-hidden="true" className={styles.rowIcon}>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="13.5" cy="6.5" r="1" fill="currentColor" />
+              <circle cx="17.5" cy="10.5" r="1" fill="currentColor" />
+              <circle cx="8.5" cy="7.5" r="1" fill="currentColor" />
+              <circle cx="6.5" cy="12.5" r="1" fill="currentColor" />
+              <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.75 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9z" />
+            </svg>
+          </span>
+          <span>{t('settingsThemeEntry')}</span>
+          <span className={styles.rowValue}>{t('settingsThemeComingSoon')}</span>
+          <span aria-hidden="true" className={styles.chevron}>
+            <IconChevronRightOutline14 />
+          </span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const currencySymbol = (currency: string) =>
+  currency === 'CNY' ? '¥' : currency === 'USD' ? '$' : `${currency} `
+
+/** DeepSeek API 账户余额查询（点击触发 GET /user/balance） */
+const AccountBalance = () => {
+  const t = useTranslate()
+  const apiKey = useSettings((state) => state.apiKey)
+  const [busy, setBusy] = useState(false)
+  const [balance, setBalance] = useState<UserBalanceResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const query = async () => {
+    if (!apiKey || busy) {
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      setBalance(await fetchUserBalance(apiKey))
+    } catch (cause) {
+      const kind = classifyApiError(cause)
+      if (kind === 'unauthorized') {
+        setError(t('apiKeyInvalid'))
+      } else if (kind === 'network') {
+        setError(t('commonNetworkErrorToast'))
+      } else {
+        const message =
+          cause instanceof ApiError && cause.localMessage
+            ? t(cause.localMessage.key, cause.localMessage.params)
+            : cause instanceof Error
+              ? cause.message
+              : String(cause)
+        setError(t('balanceQueryFailed', { message }))
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className={styles.balanceSection}>
+      <div className={styles.balanceHeader}>
+        <span className={styles.label}>{t('balanceTitle')}</span>
+        <Button
+          variant="outlined"
+          size="s"
+          disabled={!apiKey || busy}
+          onClick={() => void query()}
+        >
+          {busy ? t('balanceChecking') : balance ? t('balanceRefresh') : t('balanceCheck')}
+        </Button>
+      </div>
+      {!apiKey ? <div className={styles.description}>{t('balanceNeedKey')}</div> : null}
+      {error ? (
+        <div className={styles.error} role="alert">
+          {error}
+        </div>
+      ) : null}
+      {balance ? (
+        <div className={styles.balanceBody}>
+          {!balance.is_available ? (
+            <div className={styles.error}>{t('balanceUnavailable')}</div>
+          ) : null}
+          {balance.balance_infos.length === 0 ? (
+            <div className={styles.description}>{t('balanceEmpty')}</div>
+          ) : (
+            balance.balance_infos.map((info) => {
+              const sym = currencySymbol(info.currency)
+              return (
+                <div key={info.currency} className={styles.balanceRow}>
+                  <span className={styles.balanceTotal}>
+                    {sym}
+                    {info.total_balance}
+                  </span>
+                  <span className={styles.balanceSub}>
+                    {t('balanceToppedUp', { amount: `${sym}${info.topped_up_balance}` })}
+                    {' · '}
+                    {t('balanceGranted', { amount: `${sym}${info.granted_balance}` })}
+                  </span>
+                </div>
+              )
+            })
+          )}
+        </div>
+      ) : null}
+    </section>
   )
 }
 

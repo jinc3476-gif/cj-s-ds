@@ -8,6 +8,7 @@ import { continueReply, regenerateReply } from '../../services/chat/store.js'
 import { stopReadAloud } from '../../services/speech/readAloud.js'
 import type { AssistantMessage as AssistantMessageType } from '../../services/chat/types.js'
 import { openSettings } from '../settings/settingsDialogState.js'
+import { formatModelShortName } from '../session/ModelSwitcher.js'
 import { IconButton } from '../base/IconButton.js'
 import { Button } from '../base/Button.js'
 import { Markdown } from '../markdown/Markdown.js'
@@ -56,6 +57,11 @@ export const AssistantMessage = memo(function AssistantMessage({
   const copyText = responseText || notice?.text
   const waiting = streaming && view.steps.length === 0 && !view.answer && !message.thinking
   const summaryEntry = `${message.id}-summary`
+  const usage = message.usage
+  const totalInputTokens = usage
+    ? usage.input_tokens + usage.cache_creation_input_tokens + usage.cache_read_input_tokens
+    : 0
+  const hasMeta = !streaming && (Boolean(message.model) || Boolean(usage))
   return (
     <div className={styles.message}>
       {refused ? null : (
@@ -157,6 +163,31 @@ export const AssistantMessage = memo(function AssistantMessage({
               }}
             />
           </div>
+          {hasMeta ? (
+            <div className={styles.meta}>
+              {message.model ? (
+                <span className={styles.modelTag}>{formatModelShortName(message.model, t)}</span>
+              ) : null}
+              {usage ? (
+                <span
+                  className={styles.usage}
+                  title={t('tokenUsageTooltip', {
+                    input: totalInputTokens.toLocaleString(),
+                    uncached: usage.input_tokens.toLocaleString(),
+                    cacheCreate: usage.cache_creation_input_tokens.toLocaleString(),
+                    cacheRead: usage.cache_read_input_tokens.toLocaleString(),
+                    output: usage.output_tokens.toLocaleString(),
+                  })}
+                >
+                  {t('tokenUsageCompact', {
+                    input: totalInputTokens.toLocaleString(),
+                    output: usage.output_tokens.toLocaleString(),
+                    cache: usage.cache_read_input_tokens.toLocaleString(),
+                  })}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           {isLast && canContinueReply(message) ? (
             <Button
               variant="outlined"

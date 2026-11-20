@@ -4,7 +4,25 @@
  * 声明 deepseek_web_search / deepseek_read_url 或设置 safety_check.level 为 high 时进入扩展模式。
  */
 
-export type ChatModel = 'deepseek-flash' | 'deepseek-v4-pro'
+export const DEFAULT_MODEL = 'deepseek-flash' as const
+
+export const BUILTIN_MODELS = ['deepseek-flash', 'deepseek-v4-pro'] as const
+
+export type KnownChatModel = (typeof BUILTIN_MODELS)[number]
+
+export type ChatModel = string
+
+export type BalanceInfo = {
+  currency: string
+  total_balance: string
+  granted_balance: string
+  topped_up_balance: string
+}
+
+export type UserBalanceResponse = {
+  is_available: boolean
+  balance_infos: BalanceInfo[]
+}
 
 // ---------- 响应：内容块 ----------
 

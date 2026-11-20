@@ -165,11 +165,39 @@ const readDelta = (value: unknown): ContentBlockDelta | null => {
   }
 }
 
-const isUsage = (value: unknown) =>
-  isRecord(value) &&
-  ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens', 'output_tokens'].every(
-    (key) => typeof value[key] === 'number' && Number.isFinite(value[key])
-  )
+const isFiniteNum = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value)
+
+const readUsage = (value: unknown): import('./types.js').MessageUsage | undefined => {
+  if (!isRecord(value)) {
+    return undefined
+  }
+  const inputTokens = isFiniteNum(value.input_tokens) ? value.input_tokens : undefined
+  const outputTokens = isFiniteNum(value.output_tokens) ? value.output_tokens : undefined
+  if (inputTokens === undefined && outputTokens === undefined) {
+    return undefined
+  }
+  return {
+    input_tokens: inputTokens ?? 0,
+    cache_creation_input_tokens: isFiniteNum(value.cache_creation_input_tokens)
+      ? value.cache_creation_input_tokens
+      : 0,
+    cache_read_input_tokens: isFiniteNum(value.cache_read_input_tokens)
+      ? value.cache_read_input_tokens
+      : 0,
+    output_tokens: outputTokens ?? 0,
+    ...(isRecord(value.server_tool_use) &&
+    isFiniteNum(value.server_tool_use.web_search_requests) &&
+    isFiniteNum(value.server_tool_use.tool_search)
+      ? {
+          server_tool_use: {
+            web_search_requests: value.server_tool_use.web_search_requests,
+            tool_search: value.server_tool_use.tool_search,
+          },
+        }
+      : {}),
+  }
+}
 
 /** 未识别或无法安全消费的事件静默丢弃，不影响后续有效内容与正常结束。 */
 export const readMessageEvent = (value: unknown): MessageStreamEvent | null => {
@@ -185,7 +213,7 @@ export const readMessageEvent = (value: unknown): MessageStreamEvent | null => {
         ...value,
         message: {
           ...value.message,
-          usage: isUsage(value.message.usage) ? value.message.usage : undefined,
+          usage: readUsage(value.message.usage),
         },
       } as MessageStreamEvent
     case 'content_block_start': {
@@ -220,7 +248,7 @@ export const readMessageEvent = (value: unknown): MessageStreamEvent | null => {
           ...value.delta,
           title: isOptionalString(value.delta.title) ? value.delta.title : undefined,
         },
-        usage: isUsage(value.usage) ? value.usage : undefined,
+        usage: readUsage(value.usage),
       } as MessageStreamEvent
     case 'message_stop':
       break

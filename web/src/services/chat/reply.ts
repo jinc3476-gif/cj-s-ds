@@ -79,7 +79,11 @@ export const applyEvent = (
     reply.status === 'streaming' ? reply : { ...reply, status: 'streaming' }
   switch (event.type) {
     case 'message_start':
-      return { ...next, usage: event.message.usage ?? next.usage }
+      return {
+        ...next,
+        model: next.model ?? (event.message.model || null),
+        usage: event.message.usage ?? next.usage,
+      }
     case 'content_block_start': {
       blockIndexes.delete(event.index)
       const block = toReplyBlock(event.content_block, now)
@@ -124,13 +128,27 @@ export const applyEvent = (
           : block
       )
     }
-    case 'message_delta':
+    case 'message_delta': {
+      const incoming = event.usage
+      const usage = incoming
+        ? next.usage &&
+          incoming.input_tokens === 0 &&
+          incoming.cache_creation_input_tokens === 0 &&
+          incoming.cache_read_input_tokens === 0
+          ? {
+              ...next.usage,
+              output_tokens: incoming.output_tokens || next.usage.output_tokens,
+              ...(incoming.server_tool_use ? { server_tool_use: incoming.server_tool_use } : {}),
+            }
+          : incoming
+        : next.usage
       return {
         ...next,
         stopReason: event.delta.stop_reason,
         stopDetails: event.delta.stop_details,
-        usage: event.usage ?? next.usage,
+        usage,
       }
+    }
     default:
       return next
   }

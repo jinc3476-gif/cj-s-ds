@@ -108,6 +108,31 @@
   margin-left: auto;
 }
 
+.meta {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: 2px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.modelTag {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background-color: var(--dsw-alias-bg-skeleton);
+  color: var(--dsw-alias-label-secondary);
+  font-weight: 500;
+}
+
+.usage {
+  white-space: nowrap;
+}
+
 .summary {
   display: flex;
   align-items: center;

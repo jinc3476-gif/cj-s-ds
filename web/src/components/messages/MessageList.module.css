@@ -35,3 +35,79 @@
   margin: 0 auto;
   padding-bottom: 24px;
 }
+
+.messageItem {
+  border-radius: 14px;
+  transition: background-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.messageHighlighted {
+  background-color: rgba(78, 103, 237, 0.1);
+  box-shadow: 0 0 0 4px rgba(78, 103, 237, 0.12);
+
+  :global([data-ds-dark-theme]) & {
+    background-color: rgba(184, 188, 255, 0.12);
+    box-shadow: 0 0 0 4px rgba(184, 188, 255, 0.14);
+  }
+}
+
+:global(::highlight(quovia-search-hit)) {
+  background-color: rgba(245, 158, 11, 0.38);
+  color: inherit;
+}
+
+.footerSlot {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  margin-top: auto;
+  width: 100%;
+}
+
+@media not all and (min-width: 768px) {
+  .footerSlot {
+    position: relative;
+    bottom: auto;
+    flex-shrink: 0;
+    margin-top: 0;
+  }
+}
+
+.scrollToBottomButton {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 50%;
+  background-color: var(--dsw-alias-button-elevated-fill);
+  color: var(--dsw-alias-label-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color var(--ds-transition-duration) var(--ds-ease-in-out),
+    transform var(--ds-transition-duration) var(--ds-ease-in-out);
+
+  &:hover {
+    background-color: var(--dsw-alias-bg-layer-3);
+    transform: translateX(-50%) translateY(1px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--dsw-alias-brand-primary);
+    outline-offset: 2px;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}

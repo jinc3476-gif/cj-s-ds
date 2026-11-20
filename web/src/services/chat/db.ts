@@ -1,4 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
+import { getVisibleMessages, normalizeSession } from './branches.js'
+import { getReplyText } from './reply.js'
 import { toSessionSummary, type Project, type Session, type SessionSummary } from './types.js'
 
 /** IndexedDB 存储结构版本；新增或调整存储、索引时递增。 */
@@ -138,8 +140,14 @@ export const saveSession = async (session: Session, files: StoredFile[] = []): P
   ])
 }
 
-/** 未打开的会话也可重命名，只读取该会话，原子更新详情和列表。 */
-export const renameSession = async (id: string, title: string): Promise<void> => {
+export type SessionMetaPatch = {
+  title?: string
+  pinned?: boolean
+  projectId?: string | null
+}
+
+/** 未打开的会话也可更新元数据（重命名、置顶、移动项目），原子更新详情和列表。 */
+export const updateSessionMeta = async (id: string, patch: SessionMetaPatch): Promise<void> => {
   const tx = (await getDB()).transaction(['sessions', 'sessionSummaries'], 'readwrite')
   await Promise.all([
     (async () => {
@@ -147,7 +155,23 @@ export const renameSession = async (id: string, title: string): Promise<void> =>
         const sessions = tx.objectStore('sessions')
         const session = await sessions.get(id)
         if (session) {
-          session.title = title
+          if (patch.title !== undefined) {
+            session.title = patch.title
+          }
+          if (patch.pinned !== undefined) {
+            if (patch.pinned) {
+              session.pinned = true
+            } else {
+              delete session.pinned
+            }
+          }
+          if (patch.projectId !== undefined) {
+            if (patch.projectId) {
+              session.projectId = patch.projectId
+            } else {
+              delete session.projectId
+            }
+          }
           await sessions.put(session)
           await tx.objectStore('sessionSummaries').put(storedSummary(session))
         }
@@ -158,6 +182,92 @@ export const renameSession = async (id: string, title: string): Promise<void> =>
     })(),
     tx.done,
   ])
+}
+
+/** 未打开的会话也可重命名，只读取该会话，原子更新详情和列表。 */
+export const renameSession = (id: string, title: string): Promise<void> =>
+  updateSessionMeta(id, { title })
+
+export type ContentSearchHit = {
+  sessionId: string
+  messageId: string
+  snippet: string
+  matchCount: number
+}
+
+const buildSnippet = (text: string, index: number, length: number): string => {
+  const clean = text.replace(/\s+/g, ' ')
+  const start = Math.max(0, index - 20)
+  const end = Math.min(clean.length, index + length + 44)
+  return `${start > 0 ? '…' : ''}${clean.slice(start, end)}${end < clean.length ? '…' : ''}`
+}
+
+/** 在单个会话的可见消息中检索正文，返回首个命中消息与摘要片段。 */
+export const matchSessionContent = (session: Session, needle: string): ContentSearchHit | null => {
+  if (!needle) {
+    return null
+  }
+  const messages = getVisibleMessages(normalizeSession(session))
+  let firstMessageId: string | null = null
+  let firstSnippet = ''
+  let matchCount = 0
+  for (const message of messages) {
+    const raw = message.role === 'user' ? message.content : getReplyText(message)
+    if (!raw) {
+      continue
+    }
+    const normalized = raw.replace(/\s+/g, ' ')
+    const idx = normalized.toLowerCase().indexOf(needle)
+    if (idx !== -1) {
+      matchCount += 1
+      if (firstMessageId === null) {
+        firstMessageId = message.id
+        firstSnippet = buildSnippet(normalized, idx, needle.length)
+      }
+    }
+  }
+  return firstMessageId
+    ? { sessionId: session.id, messageId: firstMessageId, snippet: firstSnippet, matchCount }
+    : null
+}
+
+/** 按关键词扫描 IndexedDB 会话正文；已缓存在内存中的会话直接优先匹配，避免漏掉未落盘的最新内容。 */
+export const searchSessionsContent = async (
+  query: string,
+  cachedSessions: Record<string, Session>,
+  signal?: { cancelled: boolean }
+): Promise<ContentSearchHit[]> => {
+  const needle = query.trim().replace(/\s+/g, ' ').toLowerCase()
+  if (!needle) {
+    return []
+  }
+  const hits: ContentSearchHit[] = []
+  const seen = new Set<string>()
+  for (const [id, session] of Object.entries(cachedSessions)) {
+    if (signal?.cancelled) {
+      return []
+    }
+    seen.add(id)
+    const hit = matchSessionContent(session, needle)
+    if (hit) {
+      hits.push(hit)
+    }
+  }
+  const tx = (await getDB()).transaction('sessions', 'readonly')
+  for (let cursor = await tx.store.openCursor(); cursor; cursor = await cursor.continue()) {
+    if (signal?.cancelled) {
+      return []
+    }
+    const session = cursor.value
+    if (seen.has(session.id)) {
+      continue
+    }
+    const hit = matchSessionContent(session, needle)
+    if (hit) {
+      hits.push(hit)
+    }
+  }
+  return hits
 }
 
 /** 删除会话，仅清理已无会话引用的本地原件；远端文件不删。 */

@@ -41,6 +41,19 @@
   }
 }
 
+.pinBadge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: 5px;
+  color: var(--dsw-alias-brand-text);
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+
 .title {
   flex: 1;
   min-width: 0;

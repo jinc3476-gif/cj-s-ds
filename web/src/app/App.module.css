@@ -36,16 +36,29 @@
   z-index: 3000;
   display: grid;
   place-items: center;
-  background: var(--dsw-alias-bg-base);
+  background:
+    radial-gradient(circle at 50% 48%, rgba(78, 103, 237, 0.08), transparent 58%),
+    var(--dsw-alias-bg-base, #ffffff);
   clip-path: circle(150% at 50% 50%);
   animation: splashReveal 760ms 250ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
   pointer-events: none;
 }
 
+.splash[data-theme='dark'] {
+  background:
+    radial-gradient(circle at 50% 48%, rgba(139, 107, 229, 0.16), transparent 58%),
+    var(--dsw-alias-bg-base, #19191b);
+}
+
 .splash svg {
   width: 88px;
   height: 88px;
+  filter: drop-shadow(0 8px 24px rgba(78, 103, 237, 0.14));
   animation: splashMark 650ms ease-out both;
+}
+
+.splash[data-theme='dark'] svg {
+  filter: drop-shadow(0 8px 28px rgba(139, 107, 229, 0.28));
 }
 
 @keyframes splashMark {

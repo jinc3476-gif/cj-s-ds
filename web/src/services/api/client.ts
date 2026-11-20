@@ -3,10 +3,12 @@ import { readMessageEvent } from './parseEvent.js'
 import { readServerSentEvents } from './sse.js'
 import type {
   ApiErrorBody,
+  BalanceInfo,
   CreateMessageRequest,
   FileObject,
   FilePurpose,
   MessageStreamEvent,
+  UserBalanceResponse,
 } from './types.js'
 
 /** 构建期 API 地址，默认 https://api.deepseek.com；本地开发支持开发服务器代理 */
@@ -89,13 +91,90 @@ const anthropicHeaders = (apiKey: string, beta: boolean): Record<string, string>
   ...(beta ? { 'anthropic-beta': FILES_BETA } : {}),
 })
 
-/** 用 GET /models 校验 API Key（不产生费用） */
-export const verifyApiKey = async (apiKey: string, signal?: AbortSignal): Promise<void> => {
-  await request(`${API_ORIGIN}/models`, {
+/** 解析 GET /models 返回的模型 ID 列表 */
+const parseModelIds = (body: unknown): string[] => {
+  if (typeof body !== 'object' || body === null || !('data' in body)) {
+    return []
+  }
+  const list = (body as { data?: unknown }).data
+  if (!Array.isArray(list)) {
+    return []
+  }
+  const seen = new Set<string>()
+  for (const item of list) {
+    if (typeof item === 'object' && item !== null && 'id' in item) {
+      const id = (item as { id?: unknown }).id
+      if (typeof id === 'string' && id.trim()) {
+        seen.add(id.trim())
+      }
+    }
+  }
+  return [...seen]
+}
+
+/** GET /models 获取账号可用模型列表（不产生费用） */
+export const fetchAvailableModels = async (
+  apiKey: string,
+  signal?: AbortSignal
+): Promise<string[]> => {
+  const response = await request(`${API_ORIGIN}/models`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${apiKey}` },
     signal,
   })
+  try {
+    return parseModelIds(await response.json())
+  } catch {
+    return []
+  }
+}
+
+/** 用 GET /models 校验 API Key（不产生费用），同时返回可用模型列表 */
+export const verifyApiKey = (apiKey: string, signal?: AbortSignal): Promise<string[]> =>
+  fetchAvailableModels(apiKey, signal)
+
+/** GET /user/balance 查询 DeepSeek API 账户余额 */
+export const fetchUserBalance = async (
+  apiKey: string,
+  signal?: AbortSignal
+): Promise<UserBalanceResponse> => {
+  const response = await request(`${API_ORIGIN}/user/balance`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: 'application/json',
+    },
+    signal,
+  })
+  const raw: unknown = await response.json().catch(() => null)
+  if (typeof raw !== 'object' || raw === null) {
+    throw new ApiError('protocol', 'Invalid balance response')
+  }
+  const record = raw as Record<string, unknown>
+  const infos = Array.isArray(record.balance_infos)
+    ? record.balance_infos.flatMap((entry): BalanceInfo[] => {
+        if (typeof entry !== 'object' || entry === null) {
+          return []
+        }
+        const item = entry as Record<string, unknown>
+        if (typeof item.currency !== 'string' || typeof item.total_balance !== 'string') {
+          return []
+        }
+        return [
+          {
+            currency: item.currency,
+            total_balance: item.total_balance,
+            granted_balance: typeof item.granted_balance === 'string' ? item.granted_balance : '0',
+            topped_up_balance:
+              typeof item.topped_up_balance === 'string' ? item.topped_up_balance : '0',
+          },
+        ]
+      })
+    : []
+  return {
+    is_available: Boolean(record.is_available),
+    balance_infos: infos,
+  }
 }
 
 /**

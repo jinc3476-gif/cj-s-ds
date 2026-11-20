@@ -1,10 +1,10 @@
 import { create } from 'zustand'
 import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
-import type { ChatModel, CreateMessageRequest } from '../api/types.js'
+import { DEFAULT_MODEL, type CreateMessageRequest } from '../api/types.js'
 import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
-import { useSettings } from '../settings.js'
+import { buildSystemPrompt, useSettings } from '../settings.js'
 import { appendBranch, getVisibleMessages, normalizeSession, selectVersion } from './branches.js'
 import * as db from './db.js'
 import {
@@ -34,10 +34,6 @@ import {
   type UserMessage,
 } from './types.js'
 
-/** deepseek-flash 同时支持深度思考与图片输入 */
-const MODEL: ChatModel = 'deepseek-flash'
-/** 所有生成请求统一携带的助手身份说明 */
-const SYSTEM_PROMPT = '该助手为DeepSeek，由深度求索公司创造。'
 /** 保留最近打开的详情；当前会话、生成中及尚未成功保存的会话不淘汰。 */
 const SESSION_CACHE_LIMIT = 5
 /** 安全审核固定开启，所有请求都走扩展模式 */
@@ -61,12 +57,19 @@ const serverTools = (search: boolean): CreateMessageRequest['tools'] => {
 /** 允许自动补标题的请求；手动重命名后取消本轮标题写入，包含主动清空标题的情况。 */
 const titleRequests = new Set<AbortController>()
 
+export type JumpTarget = {
+  sessionId: string
+  messageId: string
+  query: string
+  token: number
+}
+
 type ChatState = {
   ready: boolean
   initError: boolean
   /** 历史导入或全部删除期间锁定交互，提交成功前仍展示原有记录。 */
   importingHistory: boolean
-  /** 仅列表元数据，按 updatedAt 降序；流式消息更新不会改变此数组。 */
+  /** 仅列表元数据，置顶优先后按 updatedAt 降序；流式消息更新不会改变此数组。 */
   sessions: SessionSummary[]
   projects: Project[]
   activeProjectId: string | null
@@ -75,6 +78,8 @@ type ChatState = {
   sessionSaveErrors: Record<string, boolean>
   /** null 表示新对话（欢迎页） */
   activeId: string | null
+  /** 搜索跳转定位的目标消息 */
+  jumpTarget: JumpTarget | null
   /** 正在生成回复的会话 */
   streaming: Record<string, AbortController>
 }
@@ -90,13 +95,16 @@ export const useChatStore = create<ChatState>(() => ({
   sessionLoadErrors: {},
   sessionSaveErrors: {},
   activeId: null,
+  jumpTarget: null,
   streaming: {},
 }))
 
 const { getState: get, setState: set } = useChatStore
 
 const sortSessions = (sessions: SessionSummary[]) =>
-  [...sessions].sort((a, b) => b.updatedAt - a.updatedAt)
+  [...sessions].sort(
+    (a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || b.updatedAt - a.updatedAt
+  )
 
 const getSession = (id: string) => {
   const cache = get().sessionCache
@@ -109,7 +117,11 @@ const getStreamController = (id: string) => {
 }
 
 const sameSummary = (a: SessionSummary, b: SessionSummary) =>
-  a.title === b.title && a.createdAt === b.createdAt && a.updatedAt === b.updatedAt
+  a.title === b.title &&
+  a.createdAt === b.createdAt &&
+  a.updatedAt === b.updatedAt &&
+  a.projectId === b.projectId &&
+  Boolean(a.pinned) === Boolean(b.pinned)
 
 const sessionAccess = new Map<string, number>()
 const unsavedSessions = new Set<string>()
@@ -259,14 +271,14 @@ export const bindChatPersistence = () => {
   }
 }
 
-/** 按当前开关创建回复：深度思考对应 thinking，智能搜索控制 deepseek_web_search。 */
+/** 按当前开关与选中模型创建回复：深度思考对应 thinking，智能搜索控制 deepseek_web_search。 */
 const createReply = (): AssistantMessage => {
-  const { thinking, search } = useSettings.getState()
+  const { model, thinking, search } = useSettings.getState()
   return {
     id: createId(),
     role: 'assistant',
     createdAt: Date.now(),
-    model: MODEL,
+    model: model || DEFAULT_MODEL,
     thinking,
     search,
     prefix: true,
@@ -437,6 +449,7 @@ export const replaceHistory = async (write: () => Promise<Project[]>): Promise<n
       sessionLoadErrors: {},
       sessionSaveErrors: {},
       activeId: null,
+      jumpTarget: null,
     })
     return summaries.length
   } finally {
@@ -496,6 +509,103 @@ export const selectSession = (id: string) => {
     void ensureSessionLoaded(id)
     trimSessionCache()
   }
+}
+
+export const jumpToMessage = (sessionId: string, messageId: string, query: string) => {
+  const summary = get().sessions.find((session) => session.id === sessionId)
+  if (!get().importingHistory && summary) {
+    touchSession(sessionId)
+    set({
+      activeId: sessionId,
+      activeProjectId: summary.projectId ?? null,
+      jumpTarget: { sessionId, messageId, query, token: Date.now() },
+    })
+    void ensureSessionLoaded(sessionId)
+    trimSessionCache()
+  }
+}
+
+export const clearJumpTarget = () => set({ jumpTarget: null })
+
+export const loadSessionForExport = async (id: string): Promise<Session | undefined> =>
+  getSession(id) ?? (await db.loadSession(id))
+
+export const togglePinSession = (id: string) => {
+  if (get().importingHistory || deletingSessions.has(id)) {
+    return
+  }
+  const summary = get().sessions.find((session) => session.id === id)
+  if (!summary) {
+    return
+  }
+  const pinned = !summary.pinned
+  if (getSession(id)) {
+    updateSession(id, (session) => {
+      const next = { ...session }
+      if (pinned) {
+        next.pinned = true
+      } else {
+        delete next.pinned
+      }
+      return next
+    })
+    persist(id)
+  } else {
+    set((state) => ({
+      sessions: sortSessions(
+        state.sessions.map((session) =>
+          session.id === id ? toSessionSummary({ ...session, pinned }) : session
+        )
+      ),
+    }))
+    void db.updateSessionMeta(id, { pinned }).catch(db.reportStorageError('pin session'))
+  }
+}
+
+export const moveSessionToProject = (id: string, projectId: string | null) => {
+  if (get().importingHistory || deletingSessions.has(id)) {
+    return false
+  }
+  const state = get()
+  const summary = state.sessions.find((session) => session.id === id)
+  if (!summary) {
+    return false
+  }
+  if (projectId && !state.projects.some((project) => project.id === projectId)) {
+    return false
+  }
+  const target = projectId ?? undefined
+  if (summary.projectId === target) {
+    return true
+  }
+  if (getSession(id)) {
+    updateSession(id, (session) => {
+      const next = { ...session }
+      if (target) {
+        next.projectId = target
+      } else {
+        delete next.projectId
+      }
+      return next
+    })
+    if (get().activeId === id) {
+      set({ activeProjectId: projectId })
+    }
+    persist(id)
+  } else {
+    set((current) => ({
+      sessions: sortSessions(
+        current.sessions.map((session) =>
+          session.id === id ? toSessionSummary({ ...session, projectId: target }) : session
+        )
+      ),
+      ...(current.activeId === id ? { activeProjectId: projectId } : {}),
+    }))
+    void db
+      .updateSessionMeta(id, { projectId })
+      .catch(db.reportStorageError('move session to project'))
+  }
+  return true
 }
 
 export const renameSession = (id: string, title: string) => {
@@ -687,7 +797,7 @@ export const sendMessage = (targetSessionId: string | null) => {
     sessionId = session.id
     touchSession(session.id)
     set((state) => ({
-      sessions: [toSessionSummary(session), ...state.sessions],
+      sessions: sortSessions([toSessionSummary(session), ...state.sessions]),
       sessionCache: { ...state.sessionCache, [session.id]: session },
       activeId: session.id,
     }))
@@ -818,11 +928,11 @@ export const continueReply = (sessionId: string, messageId: string) => {
   ) {
     return
   }
-  const { thinking, search } = useSettings.getState()
+  const { model, thinking, search } = useSettings.getState()
   const reply: AssistantMessage = {
     ...previous,
-    // 未记录请求配置的回复，续写时使用默认模型和当前开关。
-    model: previous.model ?? MODEL,
+    // 未记录请求配置的回复，续写时使用当前选中模型和开关。
+    model: previous.model ?? (model || DEFAULT_MODEL),
     thinking: previous.thinking ?? thinking,
     search: previous.search ?? search,
     status: 'pending',
@@ -1138,11 +1248,12 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           initial.thinking ?? false,
           latestReminder
         )
+        const currentSettings = useSettings.getState()
         const events = streamMessage(
-          useSettings.getState().apiKey ?? '',
+          currentSettings.apiKey ?? '',
           {
-            model: initial.model ?? MODEL,
-            system: SYSTEM_PROMPT,
+            model: initial.model ?? (currentSettings.model || DEFAULT_MODEL),
+            system: buildSystemPrompt(currentSettings.personalization),
             messages,
             thinking: { type: initial.thinking ? 'enabled' : 'disabled' },
             safety_check: SAFETY_CHECK,

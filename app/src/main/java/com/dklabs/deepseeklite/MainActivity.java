@@ -5,6 +5,8 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.security.keystore.KeyGenParameterSpec;
@@ -12,6 +14,8 @@ import android.security.keystore.KeyProperties;
 import android.util.Base64;
 import android.webkit.*;
 import android.widget.Toast;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import java.io.*;
 import java.security.KeyStore;
 import java.util.*;
@@ -24,6 +28,9 @@ public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
     private static final String ORIGIN = "https://" + HOST;
     private static final String KEY_ALIAS = "jianliao-api-key-v1";
+    private static final String PREF_THEME = "theme-preference";
+    private static final int LIGHT_BG = 0xFFFFFFFF;
+    private static final int DARK_BG = 0xFF19191B;
     private static final int FILE_PICK = 42, AUDIO_PERMISSION = 43, EXPORT_FILE = 44;
     private WebView web;
     private ValueCallback<Uri[]> fileCallback;
@@ -31,6 +38,7 @@ public class MainActivity extends Activity {
     private SharedPreferences preferences;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private File pendingExport;
+    private String pendingExportMessage;
     private AppUpdater updater;
     private NativeAudioRecorder audioRecorder;
 
@@ -43,9 +51,7 @@ public class MainActivity extends Activity {
             if (isAppPage()) web.evaluateJavascript(
                     "window.dispatchEvent(new CustomEvent('jianliao-recorder',{detail:" + event + "}))", null);
         });
-        web.setBackgroundColor(android.graphics.Color.WHITE);
-        getWindow().getDecorView().setSystemUiVisibility(getWindow().getDecorView().getSystemUiVisibility()
-                | android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        applySystemTheme(isDarkForPreference(preferences.getString(PREF_THEME, "system")));
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -158,6 +164,28 @@ public class MainActivity extends Activity {
         if (!"https".equals(uri.getScheme()) && !"http".equals(uri.getScheme())) return;
         try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); } catch (Exception ignored) { toast("未找到浏览器"); }
     }
+    private boolean isDarkForPreference(String preference) {
+        if ("dark".equals(preference)) return true;
+        if ("light".equals(preference)) return false;
+        return (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                == Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    private void applySystemTheme(boolean dark) {
+        int bg = dark ? DARK_BG : LIGHT_BG;
+        getWindow().setBackgroundDrawable(new ColorDrawable(bg));
+        getWindow().setStatusBarColor(bg);
+        getWindow().setNavigationBarColor(bg);
+        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        if (controller != null) {
+            controller.setAppearanceLightStatusBars(!dark);
+            controller.setAppearanceLightNavigationBars(!dark);
+        }
+        if (web != null) {
+            web.setBackgroundColor(bg);
+        }
+    }
+
     private void toast(String message) { runOnUiThread(() -> Toast.makeText(this, message, Toast.LENGTH_LONG).show()); }
 
     private boolean isAppPage() {
@@ -209,19 +237,33 @@ public class MainActivity extends Activity {
                 return preferences.edit().putString("api-key", Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP) + ":" + Base64.encodeToString(encrypted, Base64.NO_WRAP)).commit();
             } catch (Exception error) { return false; }
         }
+        @JavascriptInterface public void syncTheme(String preference, boolean dark) {
+            String normalized = "light".equals(preference) || "dark".equals(preference) ? preference : "system";
+            preferences.edit().putString(PREF_THEME, normalized).apply();
+            runOnUiThread(() -> {
+                if (!isDestroyed()) applySystemTheme(dark);
+            });
+        }
         @JavascriptInterface public void saveDownload(String name, String base64) {
             io.execute(() -> {
                 try {
                     if (base64.length() > 72_000_000) { toast("导出文件过大，请减少附件后重试"); return; }
-                    File file = File.createTempFile("history-", ".zip", getCacheDir());
+                    String safeName = new File(name == null || name.trim().isEmpty() ? "export.zip" : name).getName();
+                    boolean isMarkdown = safeName.toLowerCase(Locale.ROOT).endsWith(".md");
+                    String mime = isMarkdown ? "text/markdown" : "application/zip";
+                    String prefix = isMarkdown ? "chat-" : "history-";
+                    String suffix = isMarkdown ? ".md" : ".zip";
+                    String successToast = isMarkdown ? "对话已导出" : "历史记录已保存";
+                    File file = File.createTempFile(prefix, suffix, getCacheDir());
                     try (FileOutputStream stream = new FileOutputStream(file)) { stream.write(Base64.decode(base64, Base64.DEFAULT)); }
                     runOnUiThread(() -> {
                         if (pendingExport != null) { file.delete(); toast("请先完成上一次导出"); return; }
                         pendingExport = file;
+                        pendingExportMessage = successToast;
                         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
-                                .setType("application/zip").putExtra(Intent.EXTRA_TITLE, new File(name).getName());
+                                .setType(mime).putExtra(Intent.EXTRA_TITLE, safeName);
                         try { startActivityForResult(intent, EXPORT_FILE); }
-                        catch (Exception error) { pendingExport.delete(); pendingExport = null; toast("无法打开保存位置"); }
+                        catch (Exception error) { pendingExport.delete(); pendingExport = null; pendingExportMessage = null; toast("无法打开保存位置"); }
                     });
                 } catch (Exception error) { toast("导出失败，请重试"); }
             });
@@ -252,13 +294,15 @@ public class MainActivity extends Activity {
         }
         if (code == EXPORT_FILE && pendingExport != null) {
             File file = pendingExport; pendingExport = null;
+            String savedMessage = pendingExportMessage != null ? pendingExportMessage : "历史记录已保存";
+            pendingExportMessage = null;
             if (result != RESULT_OK || data == null || data.getData() == null) { file.delete(); return; }
             Uri destination = data.getData();
             io.execute(() -> {
                 try (InputStream in = new FileInputStream(file); OutputStream out = getContentResolver().openOutputStream(destination)) {
                     if (out == null) throw new IOException();
                     byte[] buffer = new byte[65536]; int count; while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
-                    toast("历史记录已保存");
+                    toast(savedMessage);
                 } catch (Exception error) { toast("保存失败，请重试"); } finally { file.delete(); }
             });
         }

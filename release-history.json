@@ -1,5 +1,24 @@
 [
   {
+    "version": "0.1.8",
+    "zh-CN": [
+      "补齐「个性化」页面，支持全局自定义指令（称呼、个人背景、回复风格、语言偏好与附加要求）并合并进系统提示词；底部预留「主题」入口。",
+      "修复深色模式下 Android 状态栏、导航栏配色与图标明暗，同步优化深浅主题开屏遮罩与启动防闪白体验。",
+      "侧边栏新增历史会话搜索，支持按标题和项目即时过滤，以及检索本地历史消息正文并高亮跳转。",
+      "顶栏新增模型切换器，支持切换 DeepSeek Flash / DeepSeek V4 Pro 及 /models 动态校验的可用模型，并在单条回复底部记录所用模型。",
+      "消息底部展示本轮输入、输出与缓存命中 Token 用量；账号管理页新增 DeepSeek API 余额查询入口。",
+      "消息列表新增「回到底部」悬浮按钮；支持会话置顶、移入或移出项目，以及单条对话复制全文和导出 Markdown。"
+    ],
+    "en-US": [
+      "Completed Personalization with global custom instructions (nickname, background, response style, language preference, and additional requirements) merged into the system prompt, plus a reserved Theme entry at the bottom.",
+      "Fixed dark-mode Android status bar and navigation bar colors and icon contrast, and adapted the splash overlay and launch background to the active theme.",
+      "Added sidebar chat search with instant title/project filtering and IndexedDB full-text message search with highlighted jump-to-message.",
+      "Added a top-bar model switcher supporting DeepSeek Flash, DeepSeek V4 Pro, and /models verification, recording the model on each reply.",
+      "Displayed per-reply input, output, and cache-hit token usage at the bottom of assistant messages, and added an API balance check in Account settings.",
+      "Added a floating scroll-to-bottom button, chat pinning, moving chats into or out of projects, and copying or exporting individual conversations as Markdown."
+    ]
+  },
+  {
     "version": "0.1.7",
     "zh-CN": [
       "项目名称右侧新增编辑和删除按钮。删除前会显示项目名称和对话数量；确认后会删除项目及其中的对话，其他对话仍在使用的附件会保留。",

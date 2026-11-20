@@ -10,7 +10,13 @@ import { SessionItem } from './SessionItem.js'
 import { closeMobileSider } from './mobileSiderState.js'
 import styles from './Projects.module.css'
 
-export const Projects = ({ onDelete }: { onDelete: (session: SessionSummary) => void }) => {
+export const Projects = ({
+  onDelete,
+  onMoveProject,
+}: {
+  onDelete: (session: SessionSummary) => void
+  onMoveProject?: (session: SessionSummary) => void
+}) => {
   const t = useTranslate()
   const { projects, sessions, activeId, activeProjectId, ready, importingHistory } = useChatStore(
     (s) => ({
@@ -96,6 +102,7 @@ export const Projects = ({ onDelete }: { onDelete: (session: SessionSummary) => 
                 session={s}
                 active={activeId === s.id}
                 onDelete={() => onDelete(s)}
+                onMoveProject={onMoveProject}
               />
             ))}
         </details>

@@ -9,6 +9,7 @@ export type SettingsSection =
   | 'appearance'
   | 'font'
   | 'personalization'
+  | 'theme'
   | 'location'
   | 'voice'
   | 'privacy'
