@@ -1,5 +1,18 @@
 [
   {
+    "version": "0.1.9",
+    "zh-CN": [
+      "重构侧边栏「项目与对话」层次排版：新增独立项目分区标题，将「新建项目对话」移至项目名称右侧并改为紧凑的「+ 新对话」胶囊，编辑与删除收纳至「⋯」菜单；项目配备双状态文件夹图标与展开微浮层卡片，项目内对话增加缩进与树形引导线。",
+      "新增移动端推拉联动侧滑手势：在内容区向右滑动即可 1:1 联动拉出侧边栏、向左滑动推回，支持按距离与轻甩速度动态落位，并自动避让纵向滚动、输入框、语音录音按钮与横向滚动内容。",
+      "对话顶栏下方新增实时状态条，一目了然展示生成速率（tok/s）、缓存命中率、1M 上下文窗口占用环与账户余额；回复完成后自动刷新余额，轻点状态条可展开完整 Token 与余额明细并手动刷新。"
+    ],
+    "en-US": [
+      "Redesigned the sidebar project and chat hierarchy: added a dedicated Projects section header, moved New Project Chat next to the project name as a compact '+ New' pill, tucked edit/delete into the '⋯' menu, added dual-state folder icons and subtle expanded cards, and indented project chats with a tree guide line.",
+      "Added mobile push-drawer swipe gestures: swipe right anywhere on the content area to smoothly pull out the sidebar 1:1 with the main view and swipe left to close, with dynamic velocity-based settling and conflict avoidance for vertical scroll, inputs, voice hold, and wide horizontal scrollers.",
+      "Added a slim live status bar below the chat header displaying generation speed (tok/s), cache hit rate, 1M context window usage ring, and account balance; balance auto-refreshes after each reply, and tapping opens a detailed breakdown popover with manual refresh."
+    ]
+  },
+  {
     "version": "0.1.8",
     "zh-CN": [
       "补齐「个性化」页面，支持全局自定义指令（称呼、个人背景、回复风格、语言偏好与附加要求）并合并进系统提示词；底部预留「主题」入口。",

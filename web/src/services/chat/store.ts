@@ -4,6 +4,7 @@ import { ApiError, streamMessage } from '../api/client.js'
 import { DEFAULT_MODEL, type CreateMessageRequest } from '../api/types.js'
 import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
+import { refreshBalance } from '../balance.js'
 import { buildSystemPrompt, useSettings } from '../settings.js'
 import { appendBranch, getVisibleMessages, normalizeSession, selectVersion } from './branches.js'
 import * as db from './db.js'
@@ -1263,7 +1264,39 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           controller.signal
         )
         const blockIndexes = new Map<number, number>()
+        let streamStartAt = 0
+        let firstOutputAt = 0
+        let lastOutputAt = 0
+        const withGenerationMs = (settled: AssistantMessage, endedAt: number): AssistantMessage => {
+          const origin = firstOutputAt || streamStartAt
+          if (!origin || !settled.usage?.output_tokens) {
+            return settled
+          }
+          const finishAt = lastOutputAt > origin ? lastOutputAt : endedAt
+          return { ...settled, generationMs: Math.max(50, finishAt - origin) }
+        }
         for await (const event of events) {
+          const now = Date.now()
+          if (event.type === 'message_start' && !streamStartAt) {
+            streamStartAt = now
+          }
+          if (
+            event.type === 'content_block_start' &&
+            (event.content_block.type === 'text' || event.content_block.type === 'thinking')
+          ) {
+            if (!firstOutputAt) {
+              firstOutputAt = now
+            }
+            lastOutputAt = now
+          } else if (
+            event.type === 'content_block_delta' &&
+            (event.delta.type === 'text_delta' || event.delta.type === 'thinking_delta')
+          ) {
+            if (!firstOutputAt) {
+              firstOutputAt = now
+            }
+            lastOutputAt = now
+          }
           receivedContent ||= event.type === 'content_block_start'
           if (
             event.type === 'message_delta' &&
@@ -1277,14 +1310,16 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             updateSession(sessionId, (session) => (session.title ? session : { ...session, title }))
             titleRequests.delete(controller)
           }
-          reply = applyEvent(reply, event, Date.now(), blockIndexes)
+          reply = applyEvent(reply, event, now, blockIndexes)
           if (document.visibilityState === 'hidden') {
             flush()
           } else {
             frame ||= requestAnimationFrame(flush)
           }
         }
-        reply = settleReply(reply, 'done', Date.now())
+        const endedAt = Date.now()
+        reply = withGenerationMs(settleReply(reply, 'done', endedAt), endedAt)
+        void refreshBalance(true)
         break
       } catch (error) {
         if (controller.signal.aborted) {

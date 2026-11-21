@@ -9,6 +9,7 @@ import {
   IconUploadOutline14,
 } from '../base/icons.js'
 import { ApiError, fetchUserBalance } from '../../services/api/client.js'
+import { useBalanceStore } from '../../services/balance.js'
 import { classifyApiError } from '../../services/api/errors.js'
 import type { UserBalanceResponse } from '../../services/api/types.js'
 import {
@@ -354,7 +355,9 @@ const AccountBalance = () => {
     setBusy(true)
     setError(null)
     try {
-      setBalance(await fetchUserBalance(apiKey))
+      const next = await fetchUserBalance(apiKey)
+      setBalance(next)
+      useBalanceStore.setState({ apiKey, data: next, loading: false, updatedAt: Date.now() })
     } catch (cause) {
       const kind = classifyApiError(cause)
       if (kind === 'unauthorized') {

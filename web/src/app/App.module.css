@@ -124,10 +124,37 @@
 
 @media not all and (min-width: 768px) {
   .frame {
+    --mobile-sider-width: min(308px, calc(100vw - 56px));
     position: fixed;
     top: var(--app-viewport-top, 0px);
     bottom: auto;
     height: var(--app-viewport-height, 100dvh);
+  }
+
+  .main[data-sider-gesture='dragging'] {
+    transition: none;
+    will-change: transform;
+  }
+
+  .main[data-sider-gesture='settling'] {
+    will-change: transform;
+  }
+
+  .main[data-sider-state='open'] {
+    transform: translate3d(var(--mobile-sider-width), 0, 0);
+    transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+
+  .main[data-sider-state='open-instant'] {
+    transform: translate3d(var(--mobile-sider-width), 0, 0);
+    transition: none;
+  }
+
+  .main[data-sider-state='closing'] {
+    transform: translate3d(0, 0, 0);
+    transition: transform 250ms cubic-bezier(0.32, 0.72, 0, 1);
+    will-change: transform;
   }
 }
 

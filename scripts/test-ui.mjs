@@ -44,6 +44,18 @@ await context.route('https://api.deepseek.com/**', async route => {
   const req = route.request()
   const url = new URL(req.url())
   const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' }
+  if (url.pathname === '/user/balance') {
+    await route.fulfill({
+      status: 200,
+      headers,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        is_available: true,
+        balance_infos: [{ currency: 'CNY', total_balance: '12.34', granted_balance: '0.00', topped_up_balance: '12.34' }],
+      }),
+    })
+    return
+  }
   if (url.pathname === '/models') {
     const invalid = req.headers().authorization?.includes('invalid')
     await route.fulfill({ status: invalid ? 401 : 200, headers, contentType: 'application/json', body: JSON.stringify(invalid ? { error: { message: 'Invalid key' } } : { data: [{ id: 'deepseek-flash' }] }) })
@@ -260,7 +272,8 @@ try {
     assert.match(b, /memory-B/)
     assert.doesNotMatch(b, /memory-A|question-A/)
     await drawer()
-    await button('编辑项目').click()
+    await page.locator('details[open]').getByRole('button', { name: '项目操作', exact: true }).click()
+    await page.getByRole('menuitem', { name: '编辑项目', exact: true }).click()
     await page.getByLabel('项目名称').fill('更名项目 B')
     await button('确定').click()
     await visible(page.locator('summary').getByText('更名项目 B', { exact: true }))

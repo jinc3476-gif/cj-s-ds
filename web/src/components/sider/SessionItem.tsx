@@ -60,11 +60,13 @@ const FolderIcon = () => (
 export const SessionItem = memo(function SessionItem({
   session,
   active,
+  nested = false,
   onDelete,
   onMoveProject,
 }: {
   session: SessionSummary
   active: boolean
+  nested?: boolean
   onDelete: () => void
   onMoveProject?: (session: SessionSummary) => void
 }) {
@@ -82,7 +84,7 @@ export const SessionItem = memo(function SessionItem({
     }
     return (
       <input
-        className={styles.renameInput}
+        className={clsx(styles.renameInput, nested && styles.nested)}
         defaultValue={displayTitle}
         autoFocus
         onFocus={(event) => event.target.select()}
@@ -158,7 +160,7 @@ export const SessionItem = memo(function SessionItem({
 
   return (
     <div
-      className={clsx(styles.item, active && styles.active)}
+      className={clsx(styles.item, active && styles.active, nested && styles.nested)}
       aria-current={active ? 'page' : undefined}
       onClick={() => {
         selectSession(session.id)

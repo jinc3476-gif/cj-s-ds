@@ -292,6 +292,7 @@ const Input = ({ sessionId, draftId }: { sessionId: string | null; draftId: stri
               type="button"
               className={clsx(styles.roundButton, voiceBusy && styles.activeMic)}
               aria-label={micLabel}
+              data-no-sider-swipe=""
               disabled={importingHistory}
               onContextMenu={(event) => event.preventDefault()}
               onPointerDown={(event) => press.begin(event, !voiceBusy)}

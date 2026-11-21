@@ -301,8 +301,8 @@
 
 .section {
   position: relative;
-  margin-top: 16px;
-  padding-top: 4px;
+  margin-top: 14px;
+  padding-top: 2px;
 
   &:first-child {
     margin-top: 0;
@@ -313,10 +313,12 @@
   position: sticky;
   top: 0;
   z-index: 20;
+  margin-bottom: 2px;
   padding: 2px 10px;
   font-size: 12px;
   line-height: 18px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--dsw-alias-label-tertiary);
   background-color: var(--dsw-specific-sidebar-fill);
   user-select: none;
@@ -403,6 +405,7 @@
   bottom: 0;
   left: 0;
   z-index: 800;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.16);
 }
 
 .drawerLayer {
@@ -410,37 +413,70 @@
   inset: 0;
   z-index: 800;
 }
-.drawerLayer[data-closing] {
-  pointer-events: none;
-  animation: maskEnter 270ms ease-in reverse both;
-}
-.drawerLayer[data-closing] .drawer {
-  animation: drawerExit 270ms ease-in both;
-}
 
 .drawerMask {
   position: absolute;
   inset: 0;
   z-index: 799;
   background: rgba(0, 0, 0, 0.28);
+
+  [data-ds-dark-theme] & {
+    background: rgba(0, 0, 0, 0.45);
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .drawer {
-    animation: drawerEnter 390ms cubic-bezier(0.26, 0.66, 0.24, 1);
+    animation: drawerEnter 320ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   .drawerMask {
-    animation: maskEnter 250ms ease-out;
+    animation: maskEnter 280ms ease-out;
   }
 }
 
+.drawerLayer[data-closing] {
+  pointer-events: none;
+  animation: maskEnter 250ms cubic-bezier(0.32, 0.72, 0, 1) reverse both;
+}
+.drawerLayer[data-closing] .drawer {
+  animation: drawerExit 250ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.drawerLayer[data-skip-enter]:not([data-closing]) .drawer,
+.drawerLayer[data-skip-enter]:not([data-closing]) .drawerMask {
+  animation: none;
+}
+
+.drawerLayer[data-gesture='dragging'] .drawer {
+  animation: none;
+  transition: none;
+  will-change: transform;
+}
+.drawerLayer[data-gesture='dragging'] .drawerMask {
+  animation: none;
+  transition: none;
+  will-change: opacity;
+}
+
+.drawerLayer[data-gesture='settling'] {
+  pointer-events: none;
+}
+.drawerLayer[data-gesture='settling'] .drawer {
+  animation: none;
+  will-change: transform;
+}
+.drawerLayer[data-gesture='settling'] .drawerMask {
+  animation: none;
+  will-change: opacity;
+}
+
 @keyframes drawerEnter {
-  from { transform: translateX(-100%); }
-  to { transform: none; }
+  from { transform: translate3d(-100%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
 }
 @keyframes drawerExit {
-  from { transform: none; }
-  to { transform: translateX(-100%); }
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-100%, 0, 0); }
 }
 
 @keyframes maskEnter {
@@ -449,8 +485,8 @@
 }
 
 .mobile {
-  width: 300px;
-  max-width: calc(100vw - 48px);
+  width: var(--mobile-sider-width, 308px);
+  max-width: calc(100vw - 56px);
 
   .searchBox {
     height: 40px;
@@ -465,9 +501,9 @@
   }
 
   .sectionHeader {
-    padding: 4px 10px 3px;
-    font-size: 14px;
-    line-height: 22px;
+    padding: 4px 12px;
+    font-size: 13px;
+    line-height: 20px;
   }
 
   .bottom {

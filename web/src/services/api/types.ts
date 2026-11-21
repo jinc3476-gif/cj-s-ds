@@ -12,6 +12,25 @@ export type KnownChatModel = (typeof BUILTIN_MODELS)[number]
 
 export type ChatModel = string
 
+/** DeepSeek V4 系列模型（deepseek-flash / deepseek-v4-pro）单对话上下文窗口上限（输入 + 输出共享） */
+export const DEFAULT_CONTEXT_WINDOW = 1_000_000
+
+/** 根据模型返回对应上下文窗口上限（tokens） */
+export const getModelContextWindow = (model: ChatModel | null | undefined): number => {
+  if (!model) {
+    return DEFAULT_CONTEXT_WINDOW
+  }
+  const normalized = model.toLowerCase()
+  if (
+    normalized === 'deepseek-flash' ||
+    normalized === 'deepseek-v4-pro' ||
+    normalized.includes('v4')
+  ) {
+    return 1_000_000
+  }
+  return DEFAULT_CONTEXT_WINDOW
+}
+
 export type BalanceInfo = {
   currency: string
   total_balance: string

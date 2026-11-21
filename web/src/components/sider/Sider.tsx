@@ -1,5 +1,14 @@
 import clsx from 'clsx'
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import {
   IconCheckOutline16,
@@ -28,6 +37,7 @@ import { openSettings } from '../settings/settingsDialogState.js'
 import { closeMobileSider, useMobileSider } from './mobileSiderState.js'
 import { SessionItem } from './SessionItem.js'
 import { Projects } from './Projects.js'
+import { useMobileSiderSwipe } from './useMobileSiderSwipe.js'
 import styles from './Sider.module.css'
 
 const SearchIcon = () => (
@@ -429,31 +439,96 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   )
 }
 
-/** 移动端抽屉：浮在页面上方，点空白区域关闭。 */
-export const MobileSider = () => {
+/** 移动端推拉式抽屉：参考 DeepSeek 手机端联动效果，支持全屏右滑唤出、左滑关闭及点空白区域关闭。 */
+export const MobileSider = ({ mainRef }: { mainRef: RefObject<HTMLElement | null> }) => {
   const open = useMobileSider((state) => state.open)
   const [retainForExit, setRetainForExit] = useState(false)
+  const [skipEnter, setSkipEnter] = useState(false)
+  const drawerRef = useRef<HTMLDivElement>(null)
+  const maskRef = useRef<HTMLDivElement>(null)
+
+  const gesturePhase = useMobileSiderSwipe({
+    drawerRef,
+    mainRef,
+    maskRef,
+    onGestureOpened: () => {
+      setSkipEnter(true)
+      setRetainForExit(true)
+    },
+    onGestureClosed: () => {
+      setSkipEnter(false)
+      setRetainForExit(false)
+    },
+  })
+
   useEffect(() => {
     if (open) {
       setRetainForExit(true)
     }
   }, [open])
-  if (!open && !retainForExit) {
+
+  const gestureActive = gesturePhase !== 'idle'
+  const closing = !open && !gestureActive && retainForExit
+
+  useLayoutEffect(() => {
+    const main = mainRef.current
+    if (!main) {
+      return
+    }
+    if (gestureActive) {
+      delete main.dataset.siderState
+      return
+    }
+    if (open) {
+      main.dataset.siderState = skipEnter ? 'open-instant' : 'open'
+    } else if (retainForExit) {
+      main.dataset.siderState = 'closing'
+    } else {
+      delete main.dataset.siderState
+    }
+  }, [open, retainForExit, skipEnter, gestureActive, mainRef])
+
+  useEffect(() => {
+    const main = mainRef.current
+    return () => {
+      if (main) {
+        delete main.dataset.siderState
+        delete main.dataset.siderGesture
+      }
+    }
+  }, [mainRef])
+
+  if (!open && !retainForExit && !gestureActive) {
     return null
   }
   return (
     <div
       className={styles.drawerLayer}
-      data-closing={!open || undefined}
-      ref={node => { if (node) { node.inert = !open } }}
-      onAnimationEnd={event => {
-        if (!open && event.target === event.currentTarget) {
+      data-closing={closing ? '' : undefined}
+      data-gesture={gestureActive ? gesturePhase : undefined}
+      data-skip-enter={skipEnter ? '' : undefined}
+      ref={(node) => {
+        if (node) {
+          node.inert = closing
+        }
+      }}
+      onAnimationEnd={(event) => {
+        if (closing && event.target === event.currentTarget) {
           setRetainForExit(false)
+          setSkipEnter(false)
         }
       }}
     >
-      <div className={styles.drawerMask} onClick={closeMobileSider} />
-      <div className={styles.drawer}>
+      <div
+        ref={maskRef}
+        className={styles.drawerMask}
+        onClick={() => {
+          if (!gestureActive) {
+            closeMobileSider()
+          }
+        }}
+      />
+      <div ref={drawerRef} className={styles.drawer}>
         <Sider mobile />
       </div>
     </div>

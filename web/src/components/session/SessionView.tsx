@@ -18,6 +18,7 @@ import { ChatInput } from '../chatInput/ChatInput.js'
 import { MessageList } from '../messages/MessageList.js'
 import { MobileHeader } from './MobileHeader.js'
 import { ModelSwitcher } from './ModelSwitcher.js'
+import { SessionStatsBar } from './SessionStatsBar.js'
 import styles from './SessionView.module.css'
 
 /** 会话页：标题栏（移动端为顶栏）+ 模型切换 + 导出操作 + 消息列表，输入框吸底 */
@@ -74,6 +75,7 @@ export const SessionView = ({
           </div>
         </div>
       )}
+      <SessionStatsBar session={session} />
       <MessageList
         session={session}
         streaming={streaming}
